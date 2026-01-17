@@ -16,7 +16,7 @@ A task with no completed status is _pending_. A task with a completion date is _
 The collection of all tasks is called a _task list_.
 
 > TODO: add concept of context/project
-
+> TODO: add completion date
 
 ## Working with tasks
 
@@ -35,7 +35,7 @@ The _canonical representation_ of a task is mostly as described on [todo.txt][ht
 (C) buy a new vacuum cleaner
 
 # This is a completed task with "A" priority
-x 2025-12-19 wish mom a happy birthday
+x wish mom a happy birthday
 ```
 
 Note that the priority of completed tasks is not shown.
