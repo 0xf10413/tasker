@@ -6,6 +6,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tasker</title>
 
+  <style>
+    .task-done {
+      text-decoration: line-through;
+    }
+  </style>
+
   <!-- Bootstrap -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/css/bootstrap.min.css"
     integrity="sha512-2bBQCjcnw658Lho4nlXJcc6WkV/UxpE/sAokbXPxQNGqmNdQrWqtw26Ns9kFF/yG792pKR1Sx8/Y1Lf1XN4GKA=="
@@ -31,17 +37,8 @@
 
       <tbody>
         {% for task in task_list.tasks %}
-        <tr>
-          <td>
-            {% if task.completed %}
-            x
-            {% else %}
-            ({{ task.priority }})
-            {% endif %}
-          </td>
-          <td>
-            {{ task.description }}
-          </td>
+        <tr hx-post="/toggle-done/{{ loop.index0 }}">
+          {% include 'task_row.html.j2' %}
         </tr>
         {% endfor %}
       </tbody>

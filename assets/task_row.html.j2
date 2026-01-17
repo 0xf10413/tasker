@@ -1,0 +1,10 @@
+<td>
+    {% if task.completed %}
+    x
+    {% else %}
+    ({{ task.priority }})
+    {% endif %}
+</td>
+<td {% if task.completed %}class="task-done" {%endif%}>
+    {{ task.description }}
+</td>
