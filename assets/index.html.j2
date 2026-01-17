@@ -27,6 +27,7 @@
 
   <div class="container">
     <h1>Tasks</h1>
+    <h2>Task list</h2>
     <table class="table">
       <thead>
         <tr>
@@ -38,11 +39,37 @@
 
       <tbody>
         {% for task in task_list.tasks %}
-        {% include 'task_row.html.j2' %}
-        {% endfor %}
+        <tr>
+          <td>
+            {% if task.completed %}
+            x
+            {% else %}
+            ↑ ({{ task.priority }}) ↓
+            {% endif %}
+          </td>
+          <td {% if task.completed %}class="task-done" {%endif%}>
+            {{ task.description }}
+          </td>
+          <td hx-post="/toggle-done/{{ task.id }}" hx-target="body">
+            ⟳
+          </td>
+        </tr> {% endfor %}
       </tbody>
-
     </table>
+
+    <h2>Add new task</h2>
+    <form autocomplete="off" method="post" action="/add-new-task">
+      <div>
+        <input type="text" name="priority" class="form-control" required placeholder="Priority" pattern="[A-Z]" />
+      </div>
+      <div>
+        <label for="description" class="form-label">Description</label>
+        <input type="text" name="description" class="form-control" required placeholder="Description" />
+      </div>
+      <div>
+        <input type="submit" value="Add" />
+      </div>
+    </form>
   </div>
 
   <!-- Bootstrap -->
