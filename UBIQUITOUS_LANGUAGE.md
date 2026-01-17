@@ -7,7 +7,7 @@ A _task_ represents some action that must be done.
 It is defined by:
 * a _priority_, which is a capital letter from the latin alphabet (i.e. one of {A, B, ..., Z})
 * a _description_, which is an arbitrary long text
-* an optional _completion date_, which represents the day and hour at which is was completed
+* an _completion_ state, which is either `true` (for a completed task) or `false` (for a pending task).
 
 Internally, to ease their manipulations, tasks may also bear an _identifier_ (or _id_).
 

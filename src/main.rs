@@ -1,59 +1,65 @@
-use axum::{
-    Json, Router,
-    http::StatusCode,
-    routing::{get, post},
-};
+use axum::extract::State;
+use axum::response::Html;
+use axum::{Router, routing::get};
+use minijinja::path_loader;
 use minijinja::{Environment, context};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
     // initialize tracing
     tracing_subscriber::fmt::init();
 
+    let mut task_list = Vec::new();
+    task_list.push(Task::new('A', "some important task"));
+    task_list.push(Task::new('B', "some less task"));
+    task_list.push(Task::new('Z', "some forgettable task"));
+
+    let shared_state = Arc::new(AppState {
+        task_list: task_list,
+    });
+
     // build our application with a route
-    let app = Router::new()
-        .route("/", get(root))
-        .route("/users", post(create_user));
+    let app = Router::new().route("/", get(root)).with_state(shared_state);
 
     // TODO: remove `unwrap` here
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     let _ = axum::serve(listener, app).await;
 }
-
-async fn root() -> String {
-    let mut env = Environment::new();
-    env.add_template("hello.txt", "Helloooo {{ name }}!")
-        .unwrap();
-    let template = env.get_template("hello.txt").unwrap();
-    return template.render(context! { name => "World" }).unwrap();
-}
-
-async fn create_user(
-    // this argument tells axum to parse the request body
-    // as JSON into a `CreateUser` type
-    Json(payload): Json<CreateUser>,
-) -> (StatusCode, Json<User>) {
-    // insert your application logic here
-    let user = User {
-        id: 1337,
-        username: payload.username,
-    };
-
-    // this will be converted into a JSON response
-    // with a status code of `201 Created`
-    (StatusCode::CREATED, Json(user))
-}
-
-// the input to our `create_user` handler
-#[derive(Deserialize)]
-struct CreateUser {
-    username: String,
-}
-
-// the output to our `create_user` handler
 #[derive(Serialize)]
-struct User {
-    id: u64,
-    username: String,
+struct Task {
+    priority: char,
+    description: String,
+    completed: bool,
+}
+
+impl Task {
+    fn new(priority: char, description: &str) -> Self {
+        if priority < 'A' || priority > 'Z' {
+            panic!() // TODO: remove panic!
+        }
+        return Self {
+            priority: priority,
+            description: String::from(description),
+            completed: false,
+        };
+    }
+}
+
+type TaskList = Vec<Task>;
+
+struct AppState {
+    task_list: TaskList,
+}
+
+async fn root(State(state): State<Arc<AppState>>) -> Html<String> {
+    let mut env = Environment::new();
+    env.set_loader(path_loader("assets"));
+    let template = env.get_template("index.html.j2").unwrap();
+    return Html(
+        template
+            .render(context! { task_list => state.task_list })
+            .unwrap(),
+    );
 }

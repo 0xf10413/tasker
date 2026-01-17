@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 axum = "0.8.8"
-minijinja = "2.14.0"
+minijinja = { version = "2.14.0", features = ["loader"] }
 serde = { version = "1.0.228", features = ["derive"] }
 tokio = { version = "1.49.0", features = ["full"] }
 tracing-subscriber = "0.3.22"
