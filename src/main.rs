@@ -18,9 +18,9 @@ async fn main() {
 
     // Set up dummy task list
     let mut task_list = TaskList::new();
-    task_list.add(Task::new('A', "some important task"));
-    task_list.add(Task::new('B', "some less important task"));
-    task_list.add(Task::new('Z', "some forgettable task"));
+    task_list.add('A', "some important task");
+    task_list.add('B', "some less important task");
+    task_list.add('Z', "some forgettable task");
 
     let shared_state = Arc::new(AppState {
         task_list: task_list.into(),
@@ -37,24 +37,15 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     let _ = axum::serve(listener, app).await;
 }
+
+type TaskId = usize;
+
 #[derive(Serialize)]
 struct Task {
+    id: TaskId,
     priority: char,
     description: String,
     completed: bool,
-}
-
-impl Task {
-    fn new(priority: char, description: &str) -> Self {
-        if priority < 'A' || priority > 'Z' {
-            panic!() // TODO: remove panic!
-        }
-        return Self {
-            priority: priority,
-            description: String::from(description),
-            completed: false,
-        };
-    }
 }
 
 #[derive(Serialize)]
@@ -63,21 +54,28 @@ struct TaskList {
     tasks: Vec<Task>,
 }
 
-type TaskId = usize;
-
-#[derive(Deserialize)]
-struct TaskToggleInput {
-    task_id: TaskId,
-}
 
 impl TaskList {
     fn new() -> Self {
         TaskList { tasks: Vec::new() }
     }
 
-    fn add(&mut self, task: Task) {
-        self.tasks.push(task);
+    fn add(&mut self, priority: char, description: &str) {
+        if priority < 'A' || priority > 'Z' {
+            panic!() // TODO: remove panic!
+        }
+        self.tasks.push(Task{
+            id: self.tasks.len(),
+            priority: priority,
+            description: String::from(description),
+            completed: false,
+        });
     }
+}
+
+#[derive(Deserialize)]
+struct TaskToggleInput {
+    task_id: TaskId,
 }
 
 struct AppState {

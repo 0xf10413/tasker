@@ -30,16 +30,15 @@
     <table class="table">
       <thead>
         <tr>
-          <th></th>
+          <th><!-- Priority/Done --></th>
           <th>Description</th>
+          <th>Done?</th>
         </tr>
       </thead>
 
       <tbody>
         {% for task in task_list.tasks %}
-        <tr hx-post="/toggle-done/{{ loop.index0 }}">
-          {% include 'task_row.html.j2' %}
-        </tr>
+        {% include 'task_row.html.j2' %}
         {% endfor %}
       </tbody>
 
