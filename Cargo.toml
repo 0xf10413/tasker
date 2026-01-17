@@ -9,3 +9,5 @@ minijinja = { version = "2.14.0", features = ["loader"] }
 serde = { version = "1.0.228", features = ["derive"] }
 tokio = { version = "1.49.0", features = ["full"] }
 tracing-subscriber = "0.3.22"
+tracing = "0.1.37"
+tower-http = { version = "0.6.8", features = ["trace"] }

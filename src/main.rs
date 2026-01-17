@@ -5,29 +5,30 @@ use minijinja::path_loader;
 use minijinja::{Environment, context};
 use serde::Serialize;
 use std::sync::Arc;
+use tower_http::trace::TraceLayer;
 
 #[tokio::main]
 async fn main() {
     // initialize tracing
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .init();
 
     // Set up dummy task list
-    let mut task_list = Vec::new();
-    task_list.push(Task::new('A', "some important task"));
-    task_list.push(Task::new('B', "some less important task"));
-    task_list.push(Task::new('Z', "some forgettable task"));
-
-    // Configure minijinja
-    let mut minijinja_env = Environment::new();
-    minijinja_env.set_loader(path_loader("assets"));
+    let mut task_list = TaskList::new();
+    task_list.add(Task::new('A', "some important task"));
+    task_list.add(Task::new('B', "some less important task"));
+    task_list.add(Task::new('Z', "some forgettable task"));
 
     let shared_state = Arc::new(AppState {
-        minijinja_env: minijinja_env,
         task_list: task_list,
     });
 
     // build our application with a route
-    let app = Router::new().route("/", get(root)).with_state(shared_state);
+    let app = Router::new()
+        .route("/", get(root))
+        .with_state(shared_state)
+        .layer(TraceLayer::new_for_http());
 
     // TODO: remove `unwrap` here
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -53,14 +54,27 @@ impl Task {
     }
 }
 
-type TaskList = Vec<Task>;
+#[derive(Serialize)]
 
-struct AppState<'a> {
-    minijinja_env: Environment<'a>, // TODO: actually use. For test purposes it's better to reload every time.
+struct TaskList {
+    tasks: Vec<Task>,
+}
+
+impl TaskList {
+    fn new() -> Self {
+        TaskList { tasks: Vec::new() }
+    }
+
+    fn add(&mut self, task: Task) {
+        self.tasks.push(task);
+    }
+}
+
+struct AppState {
     task_list: TaskList,
 }
 
-async fn root(State(state): State<Arc<AppState<'_>>>) -> Html<String> {
+async fn root(State(state): State<Arc<AppState>>) -> Html<String> {
     let mut minijinja_env = Environment::new();
     minijinja_env.set_loader(path_loader("assets"));
     let template = minijinja_env.get_template("index.html.j2").unwrap();

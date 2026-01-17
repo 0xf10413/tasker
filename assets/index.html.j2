@@ -23,14 +23,14 @@
     <h1>Tasks</h1>
     <table class="table">
       <thead>
-      <tr>
-      <th></th>
-      <th>Description</th>
-      </tr>
+        <tr>
+          <th></th>
+          <th>Description</th>
+        </tr>
       </thead>
 
       <tbody>
-        {% for task in task_list %}
+        {% for task in task_list.tasks %}
         <tr>
           <td>
             {% if task.completed %}
