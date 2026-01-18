@@ -38,4 +38,4 @@ The _canonical representation_ of a task is mostly as described on [todo.txt][ht
 x wish mom a happy birthday
 ```
 
-Note that the priority of completed tasks is not shown.
+Note that the priority of completed tasks is not shown under this representation, but may be kept internally.
