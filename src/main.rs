@@ -9,7 +9,6 @@ use minijinja::{Environment, context};
 use rusqlite::Connection;
 use rusqlite::named_params;
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
 use tower_http::trace::TraceLayer;
 
 const SQLITE_URL: &str = "./tasks.db";
@@ -39,7 +38,8 @@ async fn main() {
     // build our application with a route
     let app = Router::new()
         .route("/", get(root))
-        .route("/toggle-done/{task_id}", post(toggle_done))
+        .route("/set-pending/{task_id}", post(set_pending))
+        .route("/set-done/{task_id}", post(set_done))
         .route("/increase-priority/{task_id}", post(increase_priority))
         .route("/lower-priority/{task_id}", post(lower_priority))
         .route("/add-new-task", post(add_new_task))
@@ -52,74 +52,44 @@ async fn main() {
 
 type TaskId = i64;
 
-#[derive(Serialize, PartialEq, Debug)]
+#[derive(Serialize, Debug)]
 struct Task {
     id: TaskId,
-    priority: char,
+    priority: char, // TODO: change into its own struct
     description: String,
     completed: bool,
 }
 
 impl Task {
-    fn increase_priority(&mut self) -> &mut Self{
+    fn increase_priority(&mut self){
         match self.priority {
             'A' => (), // Do nothing if the priority is already maxed out
             _ => self.priority = std::char::from_u32(self.priority as u32 - 1).unwrap()
-        };
-        return self;
+        }
     }
 
-    fn lower_priority(&mut self) -> &mut Self{
+    fn lower_priority(&mut self){
         match self.priority {
             'Z' => (),// Do nothing if the priority is already at the minimum value
             _ => self.priority = std::char::from_u32(self.priority as u32 + 1).unwrap()
-        };
-        return self;
-    }
-}
-
-impl Eq for Task {}
-
-impl Ord for Task {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match (self.completed, other.completed) {
-            // If one of them is completed, it comes after
-            (false, true) => Ordering::Less,
-            (true, false) => Ordering::Greater,
-            // If both are unfinished, compare with priority then description
-            (false, false) => self
-                .priority
-                .cmp(&other.priority)
-                .then(self.description.cmp(&other.description)),
-            // If both are finished, compare with completion date then description
-            // TODO: completion date is not implemented, keeping prio for now
-            (true, true) => self
-                .priority
-                .cmp(&other.priority)
-                .then(self.description.cmp(&other.description)),
         }
     }
 }
 
-impl PartialOrd for Task {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-struct TaskList {
+struct TaskRepo {
     conn: Connection,
 }
 
-impl TaskList {
+impl TaskRepo {
     fn new() -> Self {
-        TaskList {
+        TaskRepo {
             conn: Connection::open(SQLITE_URL).unwrap(),
         }
     }
 
     fn add(&mut self, priority: char, description: &str) {
         if priority < 'A' || priority > 'Z' {
+            // TODO: move into Task directly
             panic!() // TODO: remove panic!
         }
         let _ = self
@@ -129,18 +99,6 @@ impl TaskList {
             INSERT INTO tasks (priority, description, completed) VALUES (?, ?, ?)
         ",
                 (String::from(priority), description, false),
-            )
-            .unwrap();
-    }
-
-    fn toggle_task_status(&mut self, task_id: TaskId) {
-        let _ = self
-            .conn
-            .execute(
-                "
-            UPDATE tasks SET completed = NOT completed WHERE id = ?
-        ",
-                (task_id,),
             )
             .unwrap();
     }
@@ -213,15 +171,28 @@ impl TaskList {
 
     fn lower_priority(&mut self, task_id: TaskId) {
         let mut task = self.get_task(task_id);
-        let updated_task = task.lower_priority();
-        self.persist_task(updated_task)
+        task.lower_priority();
+        self.persist_task(&task)
     }
 
     fn increase_priority(&mut self, task_id: TaskId) {
         let mut task = self.get_task(task_id);
-        let updated_task = task.increase_priority();
-        self.persist_task(updated_task)
+        task.increase_priority();
+        self.persist_task(&task)
     }
+
+    fn set_done(&mut self, task_id: TaskId) {
+        let mut task = self.get_task(task_id);
+        task.completed = true;
+        self.persist_task(&task)
+    }
+
+    fn set_pending(&mut self, task_id: TaskId) {
+        let mut task = self.get_task(task_id);
+        task.completed = false;
+        self.persist_task(&task)
+    }
+
 }
 
 #[derive(Deserialize)]
@@ -232,7 +203,7 @@ struct AddNewTaskInput {
 }
 
 async fn root() -> Html<String> {
-    let mut task_list = TaskList::new();
+    let mut task_list = TaskRepo::new();
 
     let mut minijinja_env = Environment::new();
     minijinja_env.set_loader(path_loader("assets"));
@@ -245,27 +216,34 @@ async fn root() -> Html<String> {
 }
 
 async fn add_new_task(Form(task_desc): Form<AddNewTaskInput>) -> Redirect {
-    let mut task_list = TaskList::new();
+    let mut task_list = TaskRepo::new();
     task_list.add(task_desc.priority, &task_desc.description);
 
     return Redirect::to("/");
 }
 
-async fn toggle_done(Path(task_id): Path<TaskId>) -> Redirect {
-    let mut task_list = TaskList::new();
-    task_list.toggle_task_status(task_id);
+async fn set_done(Path(task_id): Path<TaskId>) -> Redirect {
+    let mut task_list = TaskRepo::new();
+    task_list.set_done(task_id);
+
+    return Redirect::to("/");
+}
+
+async fn set_pending(Path(task_id): Path<TaskId>) -> Redirect {
+    let mut task_list = TaskRepo::new();
+    task_list.set_pending(task_id);
 
     return Redirect::to("/");
 }
 
 async fn increase_priority(Path(task_id): Path<TaskId>) -> Redirect {
-    let mut task_list = TaskList::new();
+    let mut task_list = TaskRepo::new();
     task_list.increase_priority(task_id);
     return Redirect::to("/");
 }
 
 async fn lower_priority(Path(task_id): Path<TaskId>) -> Redirect {
-    let mut task_list = TaskList::new();
+    let mut task_list = TaskRepo::new();
     task_list.lower_priority(task_id);
     return Redirect::to("/");
 }

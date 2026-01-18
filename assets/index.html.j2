@@ -41,25 +41,43 @@
         {% for task in tasks %}
         <tr>
           <td>
+
             {% if task.completed %}
+
             x
+
             {% else %}
+
             <span hx-post="/increase-priority/{{ task.id }}" hx-target="body">
-            ↑
+              ↑
             </span>
+
             ({{ task.priority }})
+
             <span hx-post="/lower-priority/{{ task.id }}" hx-target="body">
-            ↓
+              ↓
             </span>
+
             {% endif %}
           </td>
           <td {% if task.completed %}class="task-done" {%endif%}>
             {{ task.description }}
           </td>
-          <td hx-post="/toggle-done/{{ task.id }}" hx-target="body">
-            ⟳
+
+          <td {% if task.completed %} hx-post="/set-pending/{{ task.id }}" {% else %} hx-post="/set-done/{{ task.id }}"
+            {% endif %} hx-target="body">
+            {% if task.completed %}
+            <span title="Flag task as &quot;pending&quot;">
+              ⟳
+            </span>
+            {% else %}
+            <span title="Flag task as &quot;done&quot;">
+              ✓
+            </span>
+            {% endif %}
           </td>
-        </tr> {% endfor %}
+        </tr>
+        {% endfor %}
       </tbody>
     </table>
 
