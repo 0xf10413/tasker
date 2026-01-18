@@ -10,9 +10,12 @@ use rusqlite::Connection;
 use rusqlite::Row;
 use rusqlite::named_params;
 use serde::{Deserialize, Serialize};
+use std::env;
 use tower_http::trace::TraceLayer;
 
 const SQLITE_URL: &str = "./tasks.db";
+const TASKER_PORT_ENV_VAR: &str = "TASKER_PORT";
+const TASKER_DEFAULT_PORT: i32 = 3000;
 
 #[tokio::main]
 async fn main() {
@@ -21,6 +24,7 @@ async fn main() {
         .with_max_level(tracing::Level::DEBUG)
         .init();
 
+    // Database setup
     let conn = Connection::open(SQLITE_URL).unwrap();
     let _ = conn
         .execute(
@@ -36,7 +40,7 @@ async fn main() {
         )
         .unwrap();
 
-    // build our application with a route
+    // Routing setup
     let app = Router::new()
         .route("/", get(root))
         .route("/set-pending/{task_id}", post(set_pending))
@@ -47,8 +51,18 @@ async fn main() {
         .route("/update-description/{task_id}", post(update_description))
         .layer(TraceLayer::new_for_http());
 
+    // Finding port configuration
+    let bind_port: i32 = match env::var(TASKER_PORT_ENV_VAR) {
+        Ok(val) => match val.to_string().parse::<i32>() {
+            Ok(val) => val,
+            Err(_) => TASKER_DEFAULT_PORT,
+        },
+        Err(_) => TASKER_DEFAULT_PORT,
+    };
+    let bind_ip_port: String = format!("0.0.0.0:{}", bind_port);
+
     // TODO: remove `unwrap` here
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let listener = tokio::net::TcpListener::bind(bind_ip_port).await.unwrap();
     let _ = axum::serve(listener, app).await;
 }
 
@@ -248,15 +262,16 @@ async fn lower_priority(Path(task_id): Path<TaskId>) -> Redirect {
     return Redirect::to("/");
 }
 
-
 #[derive(Deserialize)]
 
 struct UpdateDescriptionInput {
     task_description: String,
 }
 
-
-async fn update_description(Path(task_id): Path<TaskId>, Form(task_description): Form<UpdateDescriptionInput>) -> Redirect {
+async fn update_description(
+    Path(task_id): Path<TaskId>,
+    Form(task_description): Form<UpdateDescriptionInput>,
+) -> Redirect {
     let mut task_repo = TaskRepo::new(None);
 
     let mut task = task_repo.get_task(task_id);
