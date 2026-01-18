@@ -1,16 +1,17 @@
 use axum::Form;
 use axum::extract::Path;
-use axum::extract::State;
 use axum::response::Html;
 use axum::response::Redirect;
 use axum::routing::post;
 use axum::{Router, routing::get};
 use minijinja::path_loader;
 use minijinja::{Environment, context};
+use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
-use std::sync::{Arc, Mutex};
 use tower_http::trace::TraceLayer;
+
+const SQLITE_URL: &str = "./tasks.db";
 
 #[tokio::main]
 async fn main() {
@@ -19,22 +20,26 @@ async fn main() {
         .with_max_level(tracing::Level::DEBUG)
         .init();
 
-    // Set up dummy task list
-    let mut task_list = TaskList::new();
-    task_list.add('A', "some important task");
-    task_list.add('B', "some less important task");
-    task_list.add('Z', "some forgettable task");
-
-    let shared_state = Arc::new(AppState {
-        task_list: task_list.into(),
-    });
+    let conn = Connection::open(SQLITE_URL).unwrap();
+    let _ = conn
+        .execute(
+            "
+        CREATE TABLE IF NOT EXISTS tasks (
+            id INTEGER PRIMARY KEY,
+            priority TEXT NOT NULL,
+            description TEXT NOT NULL,
+            completed INTEGER NOT NULL
+        )
+        ",
+            (),
+        )
+        .unwrap();
 
     // build our application with a route
     let app = Router::new()
         .route("/", get(root))
         .route("/toggle-done/{task_id}", post(toggle_done))
         .route("/add-new-task", post(add_new_task))
-        .with_state(shared_state)
         .layer(TraceLayer::new_for_http());
 
     // TODO: remove `unwrap` here
@@ -42,9 +47,9 @@ async fn main() {
     let _ = axum::serve(listener, app).await;
 }
 
-type TaskId = usize;
+type TaskId = i64;
 
-#[derive(Serialize, PartialEq)]
+#[derive(Serialize, PartialEq, Debug)]
 struct Task {
     id: TaskId,
     priority: char,
@@ -81,47 +86,65 @@ impl PartialOrd for Task {
     }
 }
 
-#[derive(Serialize)]
-
 struct TaskList {
-    tasks: Vec<Task>,
+    conn: Connection,
 }
 
 impl TaskList {
     fn new() -> Self {
-        TaskList { tasks: Vec::new() }
+        TaskList {
+            conn: Connection::open(SQLITE_URL).unwrap(),
+        }
     }
 
     fn add(&mut self, priority: char, description: &str) {
         if priority < 'A' || priority > 'Z' {
             panic!() // TODO: remove panic!
         }
-        self.tasks.push(Task {
-            id: self.tasks.len(),
-            priority: priority,
-            description: String::from(description),
-            completed: false,
-        });
-
-        // Always ensure we are sorted
-        self._sort();
+        let _ = self
+            .conn
+            .execute(
+                "
+            INSERT INTO tasks (priority, description, completed) VALUES (?, ?, ?)
+        ",
+                (String::from(priority), description, false),
+            )
+            .unwrap();
     }
 
     fn toggle_task_status(&mut self, task_id: TaskId) {
-        let task = &mut self.tasks[task_id];
-        task.completed = !task.completed;
-
-        // Always ensure we are sorted
-        self._sort();
+        let _ = self
+            .conn
+            .execute(
+                "
+            UPDATE tasks SET completed = NOT completed WHERE id = ?
+        ",
+                (task_id,),
+            )
+            .unwrap();
     }
 
-    // Sort internally and recompute task IDs
-    fn _sort(&mut self) {
-        self.tasks.sort();
-
-        for (index, task) in self.tasks.iter_mut().enumerate() {
-            task.id = index
-        }
+    fn get_all_tasks(&mut self) -> Vec<Task> {
+        let mut stmt = self
+            .conn
+            .prepare(
+                "
+            SELECT id, priority, description, completed FROM tasks
+            ORDER BY completed ASC, priority ASC, description ASC
+            ",
+            )
+            .unwrap();
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(Task {
+                    id: row.get_unwrap(0),
+                    priority: row.get_unwrap::<usize, String>(1).chars().nth(0).unwrap(),
+                    description: row.get_unwrap(2),
+                    completed: row.get_unwrap(3),
+                })
+            })
+            .unwrap();
+        return Vec::from_iter(rows.into_iter().map(|result| result.unwrap()));
     }
 }
 
@@ -136,35 +159,27 @@ struct AddNewTaskInput {
     description: String,
 }
 
-struct AppState {
-    task_list: Mutex<TaskList>,
-}
+async fn root() -> Html<String> {
+    let mut task_list = TaskList::new();
 
-async fn root(State(state): State<Arc<AppState>>) -> Html<String> {
     let mut minijinja_env = Environment::new();
     minijinja_env.set_loader(path_loader("assets"));
     let template = minijinja_env.get_template("index.html.j2").unwrap();
     return Html(
         template
-            .render(context! { task_list => state.task_list })
+            .render(context! { tasks => task_list.get_all_tasks() })
             .unwrap(),
     );
 }
 
-async fn toggle_done(
-    Path(task_id): Path<ToggleTaskInput>,
-    State(state): State<Arc<AppState>>,
-) -> Redirect {
-    let mut task_list = state.task_list.lock().unwrap();
+async fn toggle_done(Path(task_id): Path<ToggleTaskInput>) -> Redirect {
+    let mut task_list = TaskList::new();
     task_list.toggle_task_status(task_id.task_id);
 
     return Redirect::to("/");
 }
-async fn add_new_task(
-    State(state): State<Arc<AppState>>,
-    Form(task_desc): Form<AddNewTaskInput>,
-) -> Redirect {
-    let mut task_list = state.task_list.lock().unwrap();
+async fn add_new_task(Form(task_desc): Form<AddNewTaskInput>) -> Redirect {
+    let mut task_list = TaskList::new();
     task_list.add(task_desc.priority, &task_desc.description);
 
     return Redirect::to("/");
