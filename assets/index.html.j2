@@ -44,7 +44,13 @@
             {% if task.completed %}
             x
             {% else %}
-            ↑ ({{ task.priority }}) ↓
+            <span hx-post="/increase-priority/{{ task.id }}" hx-target="body">
+            ↑
+            </span>
+            ({{ task.priority }})
+            <span hx-post="/lower-priority/{{ task.id }}" hx-target="body">
+            ↓
+            </span>
             {% endif %}
           </td>
           <td {% if task.completed %}class="task-done" {%endif%}>
