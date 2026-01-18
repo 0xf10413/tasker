@@ -44,6 +44,7 @@ async fn main() {
         .route("/increase-priority/{task_id}", post(increase_priority))
         .route("/lower-priority/{task_id}", post(lower_priority))
         .route("/add-new-task", post(add_new_task))
+        .route("/update-description/{task_id}", post(update_description))
         .layer(TraceLayer::new_for_http());
 
     // TODO: remove `unwrap` here
@@ -242,6 +243,24 @@ async fn lower_priority(Path(task_id): Path<TaskId>) -> Redirect {
 
     let mut task = task_repo.get_task(task_id);
     task.lower_priority();
+    task_repo.persist_task(&task);
+
+    return Redirect::to("/");
+}
+
+
+#[derive(Deserialize)]
+
+struct UpdateDescriptionInput {
+    task_description: String,
+}
+
+
+async fn update_description(Path(task_id): Path<TaskId>, Form(task_description): Form<UpdateDescriptionInput>) -> Redirect {
+    let mut task_repo = TaskRepo::new(None);
+
+    let mut task = task_repo.get_task(task_id);
+    task.description = task_description.task_description; // TODO: trim
     task_repo.persist_task(&task);
 
     return Redirect::to("/");

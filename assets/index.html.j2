@@ -60,7 +60,9 @@
 
             {% endif %}
           </td>
-          <td {% if task.completed %}class="task-done" {%endif%}>
+          <td hx-vars="task_description:this.textContent.trim()" hx-post="/update-description/{{ task.id }}"
+            hx-trigger="focusout" hx-target="body" {% if task.completed %} class="task-done" {% else %}
+            contenteditable="true" contenteditable="plaintext-only" class="noLineBreaksInEdit" {%endif%}>
             {{ task.description }}
           </td>
 
@@ -100,6 +102,18 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/js/bootstrap.bundle.min.js"
     integrity="sha512-HvOjJrdwNpDbkGJIG2ZNqDlVqMo77qbs4Me4cah0HoDrfhrbA+8SBlZn1KrvAQw7cILLPFJvdwIgphzQmMm+Pw=="
     crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <script>
+    // Prevent Enter key to add line returns
+    let elements = document.getElementsByClassName('noLineBreaksInEdit');
+    for (element of elements) {
+      element.addEventListener('keydown', (evt) => {
+        if (evt.keyCode === 13) {
+          evt.preventDefault();
+        }
+      });
+    }
+  </script>
 
 </body>
 
