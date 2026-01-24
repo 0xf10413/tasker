@@ -167,31 +167,154 @@ async fn update_description(
 
 #[cfg(test)]
 mod tests {
-    use crate::sql_connection_factory::SqliteConnectionFactory;
+    use crate::sql_connection_factory::tests::TempDirSqliteConnectionFactory;
 
     use super::*;
-    use axum::http::Request;
+    use axum::http::{self, Request, header::LOCATION};
     use http_body_util::BodyExt;
-    use tower::ServiceExt;
+    use tower::Service;
 
     #[tokio::test]
-    async fn simple_root_check() {
-        // TODO: inject dependency to avoid having to rely on existing state
-        let connection_factory = Arc::new(SqliteConnectionFactory {});
+    async fn full_usage() {
+        let connection_factory = Arc::new(TempDirSqliteConnectionFactory::new().unwrap());
         TaskRepo::new(connection_factory.clone()).init_db().unwrap();
 
-        let app = build_app(AppState {
+        let mut app = build_app(AppState {
             connection_factory: connection_factory,
         });
 
+        async fn get_main_page_body(app: &mut Router) -> String {
+            let response = app
+                .call(Request::builder().uri("/").body(Body::empty()).unwrap())
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+
+            let body = response.into_body().collect().await.unwrap().to_bytes();
+            String::from_utf8(body.to_vec()).unwrap()
+        }
+
+        // Add new task
         let response = app
-            .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
+            .call(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/add-new-task")
+                    .header(
+                        http::header::CONTENT_TYPE,
+                        mime::APPLICATION_WWW_FORM_URLENCODED.as_ref(),
+                    )
+                    .body(Body::from("priority=B&description=SomeTask"))
+                    .unwrap(),
+            )
             .await
             .unwrap();
 
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert_eq!(response.headers().get(LOCATION).unwrap(), "/");
 
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        assert!(String::from_utf8(body.to_vec()).unwrap().contains("Tasks"));
+        // Ensure it appears in the output
+        let parsed_body = get_main_page_body(&mut app).await;
+        assert!(parsed_body.contains("(B)"));
+        assert!(parsed_body.contains("SomeTask"));
+
+        // Increase priority
+        let response = app
+            .call(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/increase-priority/1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert_eq!(response.headers().get(LOCATION).unwrap(), "/");
+
+        // Ensure priority was increased
+        let parsed_body = get_main_page_body(&mut app).await;
+        assert!(!parsed_body.contains("(B)"));
+        assert!(parsed_body.contains("(A)"));
+
+        // Lower priority
+        let response = app
+            .call(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/lower-priority/1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert_eq!(response.headers().get(LOCATION).unwrap(), "/");
+
+        // Ensure priority was increased
+        let parsed_body = get_main_page_body(&mut app).await;
+        assert!(!parsed_body.contains("(A)"));
+        assert!(parsed_body.contains("(B)"));
+
+        // Flag as done
+        let response = app
+            .call(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/set-done/1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert_eq!(response.headers().get(LOCATION).unwrap(), "/");
+
+        // Ensure task is flagged as done
+        let parsed_body = get_main_page_body(&mut app).await;
+        assert!(!parsed_body.contains("✓"));
+        assert!(parsed_body.contains("✗"));
+
+        // Flag as pending
+        let response = app
+            .call(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/set-pending/1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert_eq!(response.headers().get(LOCATION).unwrap(), "/");
+
+        // Ensure task is flagged as pending
+        let parsed_body = get_main_page_body(&mut app).await;
+        assert!(!parsed_body.contains("✗"));
+        assert!(parsed_body.contains("✓"));
+
+        // Update description
+        let response = app
+            .call(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/update-description/1")
+                    .header(
+                        http::header::CONTENT_TYPE,
+                        mime::APPLICATION_WWW_FORM_URLENCODED.as_ref(),
+                    )
+                    .body(Body::from("task_description=SomeNewTask"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert_eq!(response.headers().get(LOCATION).unwrap(), "/");
+
+        // Ensure task is flagged as pending
+        let parsed_body = get_main_page_body(&mut app).await;
+        assert!(!parsed_body.contains("SomeTask"));
+        assert!(parsed_body.contains("SomeNewTask"));
     }
 }

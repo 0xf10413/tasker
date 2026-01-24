@@ -38,7 +38,7 @@ test.describe('basic features', () => {
 
     expect(rowText).toContain(taskDescription)
     expect(rowText).not.toMatch(/\([A-Z]\)/) // Priority not shown
-    expect(rowText).toContain("x") // "Done" marker
+    expect(rowText).toContain("✗") // "Done" marker
   });
 
   // Flagging as "pending"
@@ -51,7 +51,7 @@ test.describe('basic features', () => {
 
     expect(rowText).toContain(taskDescription)
     expect(rowText).toContain("(B)") // Priority shown (and remembered)
-    expect(rowText).not.toContain("x") // "Done" marker
+    expect(rowText).not.toContain("✗") // "Done" marker
   });
 
 
