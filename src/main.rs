@@ -4,6 +4,8 @@ mod task;
 mod task_repo;
 mod webapp;
 
+use tokio::signal;
+
 use crate::task_repo::{TaskRepo, TaskRepoError};
 use crate::webapp::build_app;
 
@@ -53,6 +55,32 @@ async fn main() -> Result<(), ApplicativeError> {
     let bind_ip_port: String = format!("0.0.0.0:{}", bind_port);
 
     let listener = tokio::net::TcpListener::bind(bind_ip_port).await?;
-    let _ = axum::serve(listener, app).await;
+    let _ = axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await;
     Ok(())
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    tokio::select! {
+        _ = ctrl_c => {
+            println!("Received ctrl-c signal, stopping...")
+        },
+        _ = terminate => {
+            println!("Received terminate signal, stopping...")
+        },
+    }
 }
