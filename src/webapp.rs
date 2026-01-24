@@ -58,8 +58,8 @@ pub struct AppState {
 pub fn build_app(state: AppState) -> Router {
     return Router::new()
         .route("/", get(root))
-        .route("/set-pending/{task_id}", post(set_pending))
-        .route("/set-done/{task_id}", post(set_done))
+        .route("/flag-pending/{task_id}", post(flag_pending))
+        .route("/flag-done/{task_id}", post(flag_done))
         .route("/increase-priority/{task_id}", post(increase_priority))
         .route("/lower-priority/{task_id}", post(lower_priority))
         .route("/add-new-task", post(add_new_task))
@@ -97,7 +97,7 @@ async fn add_new_task(
     return Ok(Redirect::to("/"));
 }
 
-async fn set_done(State(state): State<AppState>, Path(task_id): Path<TaskId>) -> Result<Redirect> {
+async fn flag_done(State(state): State<AppState>, Path(task_id): Path<TaskId>) -> Result<Redirect> {
     let mut task_repo = TaskRepo::new(state.connection_factory);
 
     let mut task = task_repo.get_task(task_id)?;
@@ -107,7 +107,7 @@ async fn set_done(State(state): State<AppState>, Path(task_id): Path<TaskId>) ->
     return Ok(Redirect::to("/"));
 }
 
-async fn set_pending(
+async fn flag_pending(
     State(state): State<AppState>,
     Path(task_id): Path<TaskId>,
 ) -> Result<Redirect> {
@@ -261,7 +261,7 @@ mod tests {
             .call(
                 Request::builder()
                     .method(http::Method::POST)
-                    .uri("/set-done/1")
+                    .uri("/flag-done/1")
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -280,7 +280,7 @@ mod tests {
             .call(
                 Request::builder()
                     .method(http::Method::POST)
-                    .uri("/set-pending/1")
+                    .uri("/flag-pending/1")
                     .body(Body::empty())
                     .unwrap(),
             )

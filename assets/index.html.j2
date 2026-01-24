@@ -68,7 +68,7 @@
             {{ task.description }}
           </td>
 
-          <td {% if task.completed %} hx-post="/set-pending/{{ task.id }}" {% else %} hx-post="/set-done/{{ task.id }}"
+          <td {% if task.completed %} hx-post="/flag-pending/{{ task.id }}" {% else %} hx-post="/flag-done/{{ task.id }}"
             {% endif %} hx-target="body">
             {% if task.completed %}
             <span title="Flag task as &quot;pending&quot;" data-testid="task-flag-pending-{{ task.description }}">
