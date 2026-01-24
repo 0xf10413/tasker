@@ -142,3 +142,26 @@ async fn update_description(
 
     return Ok(Redirect::to("/"));
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::Request;
+    use http_body_util::BodyExt;
+    use tower::ServiceExt;
+
+    #[tokio::test]
+    async fn simple_root_check() {
+        let app = build_app();
+
+        let response = app
+            .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        assert!(String::from_utf8(body.to_vec()).unwrap().contains("Tasks"));
+    }
+}
