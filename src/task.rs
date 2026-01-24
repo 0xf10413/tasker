@@ -26,14 +26,20 @@ impl Task {
     pub fn increase_priority(&mut self) {
         match self.priority {
             'A' => (), // Do nothing if the priority is already maxed out
-            _ => self.priority = std::char::from_u32(self.priority as u32 - 1).unwrap(),
+            _ => {
+                self.priority = std::char::from_u32(self.priority as u32 - 1)
+                    .expect("Priority should be convertible safely")
+            }
         }
     }
 
     pub fn lower_priority(&mut self) {
         match self.priority {
             'Z' => (), // Do nothing if the priority is already at the minimum value
-            _ => self.priority = std::char::from_u32(self.priority as u32 + 1).unwrap(),
+            _ => {
+                self.priority = std::char::from_u32(self.priority as u32 + 1)
+                    .expect("Priority should be convertible safely")
+            }
         }
     }
 }

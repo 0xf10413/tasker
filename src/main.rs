@@ -4,26 +4,47 @@ mod task;
 mod task_repo;
 mod webapp;
 
-use crate::task_repo::TaskRepo;
+use crate::task_repo::{TaskRepo, TaskRepoError};
 use crate::webapp::build_app;
 
 const TASKER_PORT_ENV_VAR: &str = "TASKER_PORT";
 const TASKER_DEFAULT_PORT: i32 = 3000;
 
+#[allow(dead_code)] // Rust has no way to know where this is used
+#[derive(Debug)]
+enum ApplicativeError {
+    TaskRepoError(TaskRepoError),
+    IoError(std::io::Error),
+}
+
+impl From<TaskRepoError> for ApplicativeError {
+    fn from(value: TaskRepoError) -> Self {
+        ApplicativeError::TaskRepoError(value)
+    }
+}
+
+impl From<std::io::Error> for ApplicativeError {
+    fn from(value: std::io::Error) -> Self {
+        ApplicativeError::IoError(value)
+    }
+}
+
+
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), ApplicativeError> {
     // initialize tracing
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::DEBUG)
         .init();
 
     // Database setup
-    TaskRepo::new(None).init_db();
+    TaskRepo::new(None)?.init_db()?;
 
     // Routing setup
     let app = build_app();
 
     // Finding port configuration
+    // TODO: shorten via a nice rust function call
     let bind_port: i32 = match env::var(TASKER_PORT_ENV_VAR) {
         Ok(val) => match val.to_string().parse::<i32>() {
             Ok(val) => val,
@@ -33,7 +54,7 @@ async fn main() {
     };
     let bind_ip_port: String = format!("0.0.0.0:{}", bind_port);
 
-    // TODO: remove `unwrap` here
-    let listener = tokio::net::TcpListener::bind(bind_ip_port).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(bind_ip_port).await?;
     let _ = axum::serve(listener, app).await;
+    Ok(())
 }

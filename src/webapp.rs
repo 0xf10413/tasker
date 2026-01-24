@@ -1,16 +1,38 @@
 use crate::task::Task;
 use crate::task::TaskId;
 
-use crate::task_repo::TaskRepo;
+use crate::task_repo::{TaskRepo, TaskRepoError};
+use axum::body::Body;
+use axum::http::StatusCode;
 use axum::{
     Form, Router,
     extract::Path,
-    response::{Html, Redirect},
+    response::{Html, IntoResponse, Redirect, Response, Result},
     routing::{get, post},
 };
 use minijinja::{Environment, context, path_loader};
 use serde::Deserialize;
 use tower_http::trace::TraceLayer;
+
+impl IntoResponse for TaskRepoError {
+    fn into_response(self) -> Response<Body> {
+        let body = match self {
+            Self::Error { error } => error,
+            Self::SqlError { original_error } => original_error.to_string(),
+            Self::JinjaError { original_error } => original_error.to_string(),
+        };
+
+        (StatusCode::INTERNAL_SERVER_ERROR, body).into_response()
+    }
+}
+
+impl From<minijinja::Error> for TaskRepoError {
+    fn from(value: minijinja::Error) -> Self {
+        TaskRepoError::JinjaError {
+            original_error: value,
+        }
+    }
+}
 
 pub fn build_app() -> Router {
     return Router::new()
@@ -24,17 +46,15 @@ pub fn build_app() -> Router {
         .layer(TraceLayer::new_for_http());
 }
 
-async fn root() -> Html<String> {
-    let mut task_repo = TaskRepo::new(None);
+async fn root() -> Result<Html<String>, TaskRepoError> {
+    let mut task_repo = TaskRepo::new(None)?;
 
     let mut minijinja_env = Environment::new();
     minijinja_env.set_loader(path_loader("assets"));
-    let template = minijinja_env.get_template("index.html.j2").unwrap();
-    return Html(
-        template
-            .render(context! { tasks => task_repo.get_all_tasks() })
-            .unwrap(),
-    );
+    let template = minijinja_env.get_template("index.html.j2")?;
+    return Ok(Html(
+        template.render(context! { tasks => task_repo.get_all_tasks()? })?,
+    ));
 }
 
 #[derive(Deserialize)]
@@ -44,53 +64,53 @@ struct AddNewTaskInput {
     description: String,
 }
 
-async fn add_new_task(Form(task_desc): Form<AddNewTaskInput>) -> Redirect {
-    let mut task_repo = TaskRepo::new(None);
+async fn add_new_task(Form(task_desc): Form<AddNewTaskInput>) -> Result<Redirect> {
+    let mut task_repo = TaskRepo::new(None)?;
 
     let task = Task::new(task_desc.priority, &task_desc.description);
-    task_repo.persist_task(&task);
+    task_repo.persist_task(&task)?;
 
-    return Redirect::to("/");
+    return Ok(Redirect::to("/"));
 }
 
-async fn set_done(Path(task_id): Path<TaskId>) -> Redirect {
-    let mut task_repo = TaskRepo::new(None);
+async fn set_done(Path(task_id): Path<TaskId>) -> Result<Redirect> {
+    let mut task_repo = TaskRepo::new(None)?;
 
-    let mut task = task_repo.get_task(task_id);
+    let mut task = task_repo.get_task(task_id)?;
     task.completed = true;
-    task_repo.persist_task(&task);
+    task_repo.persist_task(&task)?;
 
-    return Redirect::to("/");
+    return Ok(Redirect::to("/"));
 }
 
-async fn set_pending(Path(task_id): Path<TaskId>) -> Redirect {
-    let mut task_repo = TaskRepo::new(None);
+async fn set_pending(Path(task_id): Path<TaskId>) -> Result<Redirect> {
+    let mut task_repo = TaskRepo::new(None)?;
 
-    let mut task = task_repo.get_task(task_id);
+    let mut task = task_repo.get_task(task_id)?;
     task.completed = false;
-    task_repo.persist_task(&task);
+    task_repo.persist_task(&task)?;
 
-    return Redirect::to("/");
+    return Ok(Redirect::to("/"));
 }
 
-async fn increase_priority(Path(task_id): Path<TaskId>) -> Redirect {
-    let mut task_repo = TaskRepo::new(None);
+async fn increase_priority(Path(task_id): Path<TaskId>) -> Result<Redirect> {
+    let mut task_repo = TaskRepo::new(None)?;
 
-    let mut task = task_repo.get_task(task_id);
+    let mut task = task_repo.get_task(task_id)?;
     task.increase_priority();
-    task_repo.persist_task(&task);
+    task_repo.persist_task(&task)?;
 
-    return Redirect::to("/");
+    return Ok(Redirect::to("/"));
 }
 
-async fn lower_priority(Path(task_id): Path<TaskId>) -> Redirect {
-    let mut task_repo = TaskRepo::new(None);
+async fn lower_priority(Path(task_id): Path<TaskId>) -> Result<Redirect> {
+    let mut task_repo = TaskRepo::new(None)?;
 
-    let mut task = task_repo.get_task(task_id);
+    let mut task = task_repo.get_task(task_id)?;
     task.lower_priority();
-    task_repo.persist_task(&task);
+    task_repo.persist_task(&task)?;
 
-    return Redirect::to("/");
+    return Ok(Redirect::to("/"));
 }
 
 #[derive(Deserialize)]
@@ -102,12 +122,12 @@ struct UpdateDescriptionInput {
 async fn update_description(
     Path(task_id): Path<TaskId>,
     Form(task_description): Form<UpdateDescriptionInput>,
-) -> Redirect {
-    let mut task_repo = TaskRepo::new(None);
+) -> Result<Redirect> {
+    let mut task_repo = TaskRepo::new(None)?;
 
-    let mut task = task_repo.get_task(task_id);
+    let mut task = task_repo.get_task(task_id)?;
     task.description = task_description.task_description; // TODO: trim
-    task_repo.persist_task(&task);
+    task_repo.persist_task(&task)?;
 
-    return Redirect::to("/");
+    return Ok(Redirect::to("/"));
 }
