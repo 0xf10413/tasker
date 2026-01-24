@@ -4,23 +4,28 @@ pub type TaskId = i64;
 
 #[derive(Serialize, Debug)]
 pub struct Task {
-    pub id: TaskId,     // -1 if never persisted, ID in DB otherwise
-    pub priority: char, // TODO: change into its own struct
+    pub id: TaskId, // -1 if never persisted, ID in DB otherwise
+    pub priority: char,
     pub description: String,
     pub completed: bool,
 }
 
+pub enum TaskError {
+    // Tried to set priority to a value outside of A..Z
+    PriorityNotInRangeError(char),
+}
+
 impl Task {
-    pub fn new(priority: char, description: &str) -> Task {
+    pub fn new(priority: char, description: &str) -> Result<Task, TaskError> {
         if priority < 'A' || priority > 'Z' {
-            panic!() // TODO: remove panic!
+            return Err(TaskError::PriorityNotInRangeError(priority));
         }
-        return Task {
+        return Ok(Task {
             id: -1,
             priority: priority,
             description: String::from(description),
             completed: false,
-        };
+        });
     }
 
     pub fn increase_priority(&mut self) {

@@ -29,7 +29,6 @@ impl From<std::io::Error> for ApplicativeError {
     }
 }
 
-
 #[tokio::main]
 async fn main() -> Result<(), ApplicativeError> {
     // initialize tracing
@@ -44,7 +43,6 @@ async fn main() -> Result<(), ApplicativeError> {
     let app = build_app();
 
     // Finding port configuration
-    // TODO: shorten via a nice rust function call
     let bind_port: i32 = match env::var(TASKER_PORT_ENV_VAR) {
         Ok(val) => match val.to_string().parse::<i32>() {
             Ok(val) => val,

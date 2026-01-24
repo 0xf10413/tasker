@@ -1,4 +1,5 @@
 use crate::task::Task;
+use crate::task::TaskError;
 use crate::task::TaskId;
 
 use crate::task_repo::{TaskRepo, TaskRepoError};
@@ -20,6 +21,16 @@ impl IntoResponse for TaskRepoError {
             Self::Error { error } => error,
             Self::SqlError { original_error } => original_error.to_string(),
             Self::JinjaError { original_error } => original_error.to_string(),
+        };
+
+        (StatusCode::INTERNAL_SERVER_ERROR, body).into_response()
+    }
+}
+
+impl IntoResponse for TaskError {
+    fn into_response(self) -> Response<Body> {
+        let body = match self {
+            Self::PriorityNotInRangeError(c) => format!("Priority {} not in expected range", c),
         };
 
         (StatusCode::INTERNAL_SERVER_ERROR, body).into_response()
@@ -67,7 +78,7 @@ struct AddNewTaskInput {
 async fn add_new_task(Form(task_desc): Form<AddNewTaskInput>) -> Result<Redirect> {
     let mut task_repo = TaskRepo::new(None)?;
 
-    let task = Task::new(task_desc.priority, &task_desc.description);
+    let task = Task::new(task_desc.priority, &task_desc.description)?;
     task_repo.persist_task(&task)?;
 
     return Ok(Redirect::to("/"));
@@ -126,7 +137,7 @@ async fn update_description(
     let mut task_repo = TaskRepo::new(None)?;
 
     let mut task = task_repo.get_task(task_id)?;
-    task.description = task_description.task_description; // TODO: trim
+    task.description = String::from(task_description.task_description.trim());
     task_repo.persist_task(&task)?;
 
     return Ok(Redirect::to("/"));
