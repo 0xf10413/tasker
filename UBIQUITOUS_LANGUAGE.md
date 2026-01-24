@@ -11,12 +11,15 @@ It is defined by:
 
 Internally, to ease their manipulations, tasks may also bear an _identifier_ (or _id_).
 
-A task with no completed status is _pending_. A task with a completion date is _done_. Tasks have no other status.
+A task with no completed status is _pending_. This is the default status.
+
+A task may be _flagged_ as _done_ when the corresponding action is completed. Tasks have no other status.
+
+_Flagging as pending_ is the action of reverting the status from "done" back to "pending".
 
 The collection of all tasks is called a _task list_.
 
 > TODO: add concept of context/project
-> TODO: add completion date
 
 ## Working with tasks
 

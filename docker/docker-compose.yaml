@@ -1,0 +1,11 @@
+services:
+  tasker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    environment:
+     - TASKER_PORT=3000
+    ports:
+      - 3000:3000
+    entrypoint:
+    - /tasker

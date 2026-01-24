@@ -28,7 +28,7 @@
   <div class="container">
     <h1>Tasks</h1>
     <h2>Task list</h2>
-    <table class="table">
+    <table class="table table-hover">
       <thead>
         <tr>
           <th><!-- Priority/Done --></th>
@@ -39,7 +39,7 @@
 
       <tbody>
         {% for task in tasks %}
-        <tr>
+        <tr data-testid="task-row-{{ task.description }}">
           <td>
 
             {% if task.completed %}
@@ -48,13 +48,15 @@
 
             {% else %}
 
-            <span hx-post="/increase-priority/{{ task.id }}" hx-target="body">
+            <span hx-post="/increase-priority/{{ task.id }}" hx-target="body"
+              data-testid="task-increase-priority-{{ task.description }}">
               ↑
             </span>
 
             ({{ task.priority }})
 
-            <span hx-post="/lower-priority/{{ task.id }}" hx-target="body">
+            <span hx-post="/lower-priority/{{ task.id }}" hx-target="body"
+              data-testid="task-lower-priority-{{ task.description }}">
               ↓
             </span>
 
@@ -69,11 +71,11 @@
           <td {% if task.completed %} hx-post="/set-pending/{{ task.id }}" {% else %} hx-post="/set-done/{{ task.id }}"
             {% endif %} hx-target="body">
             {% if task.completed %}
-            <span title="Flag task as &quot;pending&quot;">
+            <span title="Flag task as &quot;pending&quot;" data-testid="task-flag-pending-{{ task.description }}">
               ⟳
             </span>
             {% else %}
-            <span title="Flag task as &quot;done&quot;">
+            <span title="Flag task as &quot;done&quot;" data-testid="task-flag-done-{{ task.description }}">
               ✓
             </span>
             {% endif %}
