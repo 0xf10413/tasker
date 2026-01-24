@@ -1,9 +1,13 @@
+use std::sync::Arc;
+
+use crate::sql_connection_factory::SqlConnectionFactory;
 use crate::task::Task;
 use crate::task::TaskError;
 use crate::task::TaskId;
 
 use crate::task_repo::{TaskRepo, TaskRepoError};
 use axum::body::Body;
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::{
     Form, Router,
@@ -20,6 +24,7 @@ impl IntoResponse for TaskRepoError {
         let body = match self {
             Self::Error { error } => error,
             Self::SqlError { original_error } => original_error.to_string(),
+            Self::IoError { original_error } => original_error.to_string(),
             Self::JinjaError { original_error } => original_error.to_string(),
         };
 
@@ -45,7 +50,12 @@ impl From<minijinja::Error> for TaskRepoError {
     }
 }
 
-pub fn build_app() -> Router {
+#[derive(Clone)]
+pub struct AppState {
+    pub connection_factory: Arc<dyn SqlConnectionFactory>,
+}
+
+pub fn build_app(state: AppState) -> Router {
     return Router::new()
         .route("/", get(root))
         .route("/set-pending/{task_id}", post(set_pending))
@@ -54,11 +64,12 @@ pub fn build_app() -> Router {
         .route("/lower-priority/{task_id}", post(lower_priority))
         .route("/add-new-task", post(add_new_task))
         .route("/update-description/{task_id}", post(update_description))
+        .with_state(state)
         .layer(TraceLayer::new_for_http());
 }
 
-async fn root() -> Result<Html<String>, TaskRepoError> {
-    let mut task_repo = TaskRepo::new(None)?;
+async fn root(State(state): State<AppState>) -> Result<Html<String>, TaskRepoError> {
+    let mut task_repo = TaskRepo::new(state.connection_factory);
 
     let mut minijinja_env = Environment::new();
     minijinja_env.set_loader(path_loader("assets"));
@@ -74,8 +85,11 @@ struct AddNewTaskInput {
     description: String,
 }
 
-async fn add_new_task(Form(task_desc): Form<AddNewTaskInput>) -> Result<Redirect> {
-    let mut task_repo = TaskRepo::new(None)?;
+async fn add_new_task(
+    State(state): State<AppState>,
+    Form(task_desc): Form<AddNewTaskInput>,
+) -> Result<Redirect> {
+    let mut task_repo = TaskRepo::new(state.connection_factory);
 
     let task = Task::new(task_desc.priority, &task_desc.description)?;
     task_repo.persist_task(&task)?;
@@ -83,8 +97,8 @@ async fn add_new_task(Form(task_desc): Form<AddNewTaskInput>) -> Result<Redirect
     return Ok(Redirect::to("/"));
 }
 
-async fn set_done(Path(task_id): Path<TaskId>) -> Result<Redirect> {
-    let mut task_repo = TaskRepo::new(None)?;
+async fn set_done(State(state): State<AppState>, Path(task_id): Path<TaskId>) -> Result<Redirect> {
+    let mut task_repo = TaskRepo::new(state.connection_factory);
 
     let mut task = task_repo.get_task(task_id)?;
     task.completed = true;
@@ -93,8 +107,11 @@ async fn set_done(Path(task_id): Path<TaskId>) -> Result<Redirect> {
     return Ok(Redirect::to("/"));
 }
 
-async fn set_pending(Path(task_id): Path<TaskId>) -> Result<Redirect> {
-    let mut task_repo = TaskRepo::new(None)?;
+async fn set_pending(
+    State(state): State<AppState>,
+    Path(task_id): Path<TaskId>,
+) -> Result<Redirect> {
+    let mut task_repo = TaskRepo::new(state.connection_factory);
 
     let mut task = task_repo.get_task(task_id)?;
     task.completed = false;
@@ -103,8 +120,11 @@ async fn set_pending(Path(task_id): Path<TaskId>) -> Result<Redirect> {
     return Ok(Redirect::to("/"));
 }
 
-async fn increase_priority(Path(task_id): Path<TaskId>) -> Result<Redirect> {
-    let mut task_repo = TaskRepo::new(None)?;
+async fn increase_priority(
+    State(state): State<AppState>,
+    Path(task_id): Path<TaskId>,
+) -> Result<Redirect> {
+    let mut task_repo = TaskRepo::new(state.connection_factory);
 
     let mut task = task_repo.get_task(task_id)?;
     task.increase_priority();
@@ -113,8 +133,11 @@ async fn increase_priority(Path(task_id): Path<TaskId>) -> Result<Redirect> {
     return Ok(Redirect::to("/"));
 }
 
-async fn lower_priority(Path(task_id): Path<TaskId>) -> Result<Redirect> {
-    let mut task_repo = TaskRepo::new(None)?;
+async fn lower_priority(
+    State(state): State<AppState>,
+    Path(task_id): Path<TaskId>,
+) -> Result<Redirect> {
+    let mut task_repo = TaskRepo::new(state.connection_factory);
 
     let mut task = task_repo.get_task(task_id)?;
     task.lower_priority();
@@ -129,10 +152,11 @@ struct UpdateDescriptionInput {
 }
 
 async fn update_description(
+    State(state): State<AppState>,
     Path(task_id): Path<TaskId>,
     Form(task_description): Form<UpdateDescriptionInput>,
 ) -> Result<Redirect> {
-    let mut task_repo = TaskRepo::new(None)?;
+    let mut task_repo = TaskRepo::new(state.connection_factory);
 
     let mut task = task_repo.get_task(task_id)?;
     task.description = String::from(task_description.task_description.trim());
@@ -143,6 +167,8 @@ async fn update_description(
 
 #[cfg(test)]
 mod tests {
+    use crate::sql_connection_factory::SqliteConnectionFactory;
+
     use super::*;
     use axum::http::Request;
     use http_body_util::BodyExt;
@@ -151,9 +177,12 @@ mod tests {
     #[tokio::test]
     async fn simple_root_check() {
         // TODO: inject dependency to avoid having to rely on existing state
-        TaskRepo::new(None).unwrap().init_db().unwrap();
+        let connection_factory = Arc::new(SqliteConnectionFactory {});
+        TaskRepo::new(connection_factory.clone()).init_db().unwrap();
 
-        let app = build_app();
+        let app = build_app(AppState {
+            connection_factory: connection_factory,
+        });
 
         let response = app
             .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())

@@ -1,13 +1,16 @@
 use std::env;
+use std::sync::Arc;
 
+mod sql_connection_factory;
 mod task;
 mod task_repo;
 mod webapp;
 
 use tokio::signal;
 
+use crate::sql_connection_factory::SqliteConnectionFactory;
 use crate::task_repo::{TaskRepo, TaskRepoError};
-use crate::webapp::build_app;
+use crate::webapp::{AppState, build_app};
 
 const TASKER_PORT_ENV_VAR: &str = "TASKER_PORT";
 const TASKER_DEFAULT_PORT: i32 = 3000;
@@ -39,10 +42,13 @@ async fn main() -> Result<(), ApplicativeError> {
         .init();
 
     // Database setup
-    TaskRepo::new(None)?.init_db()?;
+    TaskRepo::new(Arc::new(SqliteConnectionFactory {})).init_db()?;
 
     // Routing setup
-    let app = build_app();
+    let app_state = AppState {
+        connection_factory: Arc::new(SqliteConnectionFactory {}),
+    };
+    let app = build_app(app_state);
 
     // Finding port configuration
     let bind_port: i32 = match env::var(TASKER_PORT_ENV_VAR) {

@@ -1,20 +1,21 @@
-use rusqlite::Connection;
+use std::sync::Arc;
+
 use rusqlite::Row;
 use rusqlite::named_params;
 
+use crate::sql_connection_factory::SqlConnectionFactory;
 use crate::task::Task;
 use crate::task::TaskId;
 
-const SQLITE_URL: &str = "./tasks.db";
-
 pub struct TaskRepo {
-    conn: Connection,
+    connection_factory: Arc<dyn SqlConnectionFactory>,
 }
 
 #[derive(Debug)]
 pub enum TaskRepoError {
     Error { error: String },
     SqlError { original_error: rusqlite::Error },
+    IoError { original_error: std::io::Error },
     JinjaError { original_error: minijinja::Error }, // TODO: this is not really a repo error...
 }
 
@@ -26,14 +27,20 @@ impl From<rusqlite::Error> for TaskRepoError {
     }
 }
 
+impl From<std::io::Error> for TaskRepoError {
+    fn from(value: std::io::Error) -> Self {
+        TaskRepoError::IoError {
+            original_error: value,
+        }
+    }
+}
+
 impl TaskRepo {
-    pub fn new(connection: Option<rusqlite::Connection>) -> Result<Self, TaskRepoError> {
-        Ok(TaskRepo {
-            conn: match connection {
-                Some(connection) => connection,
-                None => Connection::open(SQLITE_URL)?,
-            },
-        })
+    // TODO: check if can be removed
+    pub fn new(connection_factory: Arc<dyn SqlConnectionFactory>) -> TaskRepo {
+        TaskRepo {
+            connection_factory: connection_factory,
+        }
     }
 
     fn task_from_row(row: &Row) -> Result<Task, TaskRepoError> {
@@ -52,7 +59,8 @@ impl TaskRepo {
     }
 
     pub fn init_db(&mut self) -> Result<(), TaskRepoError> {
-        self.conn.execute(
+        let conn = self.connection_factory.open()?;
+        conn.execute(
             "
             CREATE TABLE IF NOT EXISTS tasks (
                 id INTEGER PRIMARY KEY,
@@ -67,7 +75,8 @@ impl TaskRepo {
     }
 
     pub fn get_all_tasks(&mut self) -> Result<Vec<Task>, TaskRepoError> {
-        let mut stmt = self.conn.prepare(
+        let conn = self.connection_factory.open()?;
+        let mut stmt = conn.prepare(
             "
             SELECT id, priority, description, completed FROM tasks
             ORDER BY completed ASC, priority ASC, description ASC
@@ -78,7 +87,8 @@ impl TaskRepo {
     }
 
     pub fn get_task(&mut self, task_id: TaskId) -> Result<Task, TaskRepoError> {
-        let mut stmt = self.conn.prepare(
+        let conn = self.connection_factory.open()?;
+        let mut stmt = conn.prepare(
             "
             SELECT id, priority, description, completed FROM tasks
             WHERE id = ?
@@ -94,9 +104,10 @@ impl TaskRepo {
     }
 
     pub fn persist_task(&mut self, task: &Task) -> Result<(), TaskRepoError> {
+        let conn = self.connection_factory.open()?;
         if task.id < 0 {
             // New task, need to insert
-            let mut stmt = self.conn.prepare(
+            let mut stmt = conn.prepare(
                 "
             INSERT INTO tasks (priority, description, completed)
             VALUES (:priority, :description, :completed)
@@ -108,7 +119,7 @@ impl TaskRepo {
             return Ok(());
         } else {
             // Existing task, need to update
-            let mut stmt = self.conn.prepare(
+            let mut stmt = conn.prepare(
                 "
             UPDATE tasks SET
             priority = :priority, description = :description, completed = :completed
@@ -123,12 +134,14 @@ impl TaskRepo {
 
 #[cfg(test)]
 mod tests {
+    use crate::sql_connection_factory::tests::TempDirSqliteConnectionFactory;
+
     use super::*;
 
     #[test]
     fn get_all_is_ordered() -> Result<(), TaskRepoError> {
-        let conn = Connection::open_in_memory()?;
-        let mut task_repo = TaskRepo::new(Some(conn))?;
+        let connection_factory = Arc::new(TempDirSqliteConnectionFactory::new()?);
+        let mut task_repo = TaskRepo::new(connection_factory);
 
         // Has to be called always to initialize schema
         task_repo.init_db()?;
@@ -162,8 +175,8 @@ mod tests {
 
     #[test]
     fn persisting() -> Result<(), TaskRepoError> {
-        let conn = Connection::open_in_memory()?;
-        let mut task_repo = TaskRepo::new(Some(conn))?;
+        let connection_factory = Arc::new(TempDirSqliteConnectionFactory::new()?);
+        let mut task_repo = TaskRepo::new(connection_factory);
 
         // Has to be called always to initialize schema
         task_repo.init_db()?;
