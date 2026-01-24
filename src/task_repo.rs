@@ -15,7 +15,7 @@ pub struct TaskRepo {
 pub enum TaskRepoError {
     Error { error: String },
     SqlError { original_error: rusqlite::Error },
-    JinjaError { original_error: minijinja::Error },
+    JinjaError { original_error: minijinja::Error }, // TODO: this is not really a repo error...
 }
 
 impl From<rusqlite::Error> for TaskRepoError {
