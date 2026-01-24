@@ -69,7 +69,6 @@ async fn root() -> Result<Html<String>, TaskRepoError> {
 }
 
 #[derive(Deserialize)]
-
 struct AddNewTaskInput {
     priority: char,
     description: String,
@@ -125,7 +124,6 @@ async fn lower_priority(Path(task_id): Path<TaskId>) -> Result<Redirect> {
 }
 
 #[derive(Deserialize)]
-
 struct UpdateDescriptionInput {
     task_description: String,
 }
@@ -152,6 +150,9 @@ mod tests {
 
     #[tokio::test]
     async fn simple_root_check() {
+        // TODO: inject dependency to avoid having to rely on existing state
+        TaskRepo::new(None).unwrap().init_db().unwrap();
+
         let app = build_app();
 
         let response = app
