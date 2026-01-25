@@ -27,15 +27,15 @@ impl std::fmt::Display for TaskError {
 impl Task {
     // Creates a brand new, never-persisted-before Task
     pub fn new(priority: char, description: &str) -> Result<Task, TaskError> {
-        if priority < 'A' || priority > 'Z' {
+        if !priority.is_ascii_uppercase() {
             return Err(TaskError::PriorityNotInRangeError(priority));
         }
-        return Ok(Task {
+        Ok(Task {
             id: -1,
-            priority: priority,
+            priority,
             description: String::from(description),
             completed: false,
-        });
+        })
     }
 
     pub fn increase_priority(&mut self) {

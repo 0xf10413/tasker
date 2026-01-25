@@ -1,11 +1,13 @@
-all: fmt build test
-
-
-build:
-	cargo build
+all: fmt lint build test
 
 fmt:
 	cargo fmt
+
+lint:
+	cargo clippy
+
+build:
+	cargo build
 
 test:
 	cargo test

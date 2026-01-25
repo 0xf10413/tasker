@@ -10,7 +10,7 @@ pub struct SqliteConnectionFactory;
 
 impl SqlConnectionFactory for SqliteConnectionFactory {
     fn open(&self) -> Result<Connection, Error> {
-        Ok(Connection::open(SQLITE_URL)?)
+        Connection::open(SQLITE_URL)
     }
 }
 

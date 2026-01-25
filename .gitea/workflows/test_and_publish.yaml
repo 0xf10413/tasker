@@ -18,6 +18,13 @@ jobs:
         with:
           toolchain: 1.93.0
           targets: aarch64-unknown-linux-gnu
+          components: rustfmt, clippy
+
+      - name: Check format
+        run: cargo fmt --check
+
+      - name: Run linter
+        run: cargo clippy
 
       - name: Build binaries (non-optimized)
         run: cargo build

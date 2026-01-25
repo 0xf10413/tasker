@@ -58,7 +58,7 @@ pub struct AppState {
 }
 
 pub fn build_app(state: AppState) -> Router {
-    return Router::new()
+    Router::new()
         .route("/", get(root))
         .route("/flag-pending/{task_id}", post(flag_pending))
         .route("/flag-done/{task_id}", post(flag_done))
@@ -67,14 +67,14 @@ pub fn build_app(state: AppState) -> Router {
         .route("/add-new-task", post(add_new_task))
         .route("/update-description/{task_id}", post(update_description))
         .with_state(state)
-        .layer(TraceLayer::new_for_http());
+        .layer(TraceLayer::new_for_http())
 }
 
 fn render<S: Serialize>(template: &str, context: S) -> Result<Html<String>, TaskRepoError> {
     let mut minijinja_env = Environment::new();
     minijinja_env.set_loader(path_loader("assets"));
     let template = minijinja_env.get_template(template)?;
-    return Ok(Html(template.render(context)?));
+    Ok(Html(template.render(context)?))
 }
 
 async fn root(State(state): State<AppState>) -> Result<Html<String>, TaskRepoError> {
@@ -99,7 +99,7 @@ async fn add_new_task(
     let task = Task::new(task_desc.priority, &task_desc.description)?;
     task_repo.persist_task(&task)?;
 
-    return Ok(Redirect::to("/"));
+    Ok(Redirect::to("/"))
 }
 
 async fn flag_done(
@@ -170,7 +170,7 @@ async fn update_description(
     task.description = String::from(task_description.task_description.trim());
     task_repo.persist_task(&task)?;
 
-    return Ok(Response::new(Body::empty()));
+    Ok(Response::new(Body::empty()))
 }
 
 #[cfg(test)]

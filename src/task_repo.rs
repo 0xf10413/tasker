@@ -47,9 +47,7 @@ impl From<TaskError> for TaskRepoError {
 
 impl TaskRepo {
     pub fn new(connection_factory: Arc<dyn SqlConnectionFactory>) -> TaskRepo {
-        TaskRepo {
-            connection_factory: connection_factory,
-        }
+        TaskRepo { connection_factory }
     }
 
     fn task_from_row(row: &Row) -> Result<Task, TaskRepoError> {
@@ -91,8 +89,8 @@ impl TaskRepo {
             ORDER BY completed ASC, priority ASC, description ASC
             ",
         )?;
-        let rows = stmt.query_and_then([], |row| Self::task_from_row(row))?;
-        return rows.into_iter().collect();
+        let rows = stmt.query_and_then([], Self::task_from_row)?;
+        rows.into_iter().collect()
     }
 
     pub fn get_task(&mut self, task_id: TaskId) -> Result<Task, TaskRepoError> {
@@ -109,7 +107,7 @@ impl TaskRepo {
             error: format!("Task {} not found in storage", task_id),
         })?;
 
-        return Self::task_from_row(row);
+        Self::task_from_row(row)
     }
 
     pub fn persist_task(&mut self, task: &Task) -> Result<(), TaskRepoError> {
@@ -125,7 +123,7 @@ impl TaskRepo {
 
             let params = named_params! {":priority": String::from(task.priority), ":description": task.description, ":completed": task.completed};
             stmt.execute(params)?;
-            return Ok(());
+            Ok(())
         } else {
             // Existing task, need to update
             let mut stmt = conn.prepare(
@@ -136,7 +134,7 @@ impl TaskRepo {
             )?;
             let params = named_params! {":priority": String::from(task.priority), ":description": task.description, ":completed": task.completed, ":id": task.id};
             stmt.execute(params)?;
-            return Ok(());
+            Ok(())
         }
     }
 }
