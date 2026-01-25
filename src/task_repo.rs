@@ -137,6 +137,15 @@ impl TaskRepo {
             Ok(())
         }
     }
+
+    pub fn cleanup(&mut self) -> Result<(), TaskRepoError> {
+        let conn = self.connection_factory.open()?;
+
+        // New task, need to insert
+        conn.execute("DELETE FROM tasks WHERE completed", [])?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -212,6 +221,31 @@ mod tests {
         assert_eq!(retrieved_task.priority, 'C');
         assert_eq!(retrieved_task.description, "A new description");
         assert_eq!(retrieved_task.completed, true);
+
+        Ok(())
+    }
+
+    #[test]
+    fn cleanup() -> Result<(), TaskRepoError> {
+        let connection_factory = Arc::new(TempDirSqliteConnectionFactory::new()?);
+        let mut task_repo = TaskRepo::new(connection_factory);
+
+        // Has to be called always to initialize schema
+        task_repo.init_db()?;
+
+        task_repo.persist_task(&Task::new('C', "Some low importance task")?)?;
+
+        // Pending tasks are spared
+        task_repo.cleanup()?;
+        let mut existing_task = task_repo.get_task(1)?;
+        assert_eq!(existing_task.description, "Some low importance task");
+
+        existing_task.completed = true;
+        task_repo.persist_task(&existing_task)?;
+
+        // Completed tasks are deleted
+        task_repo.cleanup()?;
+        assert!(task_repo.get_task(1).is_err());
 
         Ok(())
     }

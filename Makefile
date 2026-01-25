@@ -13,12 +13,12 @@ test:
 	cargo test
 
 DOCKER_COMPOSE=docker-compose -f docker/docker-compose.yaml --project-directory .
-setup-e2e-env:
+setup-e2e-env: build
 	$(DOCKER_COMPOSE) down
 	$(DOCKER_COMPOSE) build
 	$(DOCKER_COMPOSE) up --wait
 
-e2e-tests:
+e2e-tests: build
 	$(DOCKER_COMPOSE) down
 	$(DOCKER_COMPOSE) build
 	$(DOCKER_COMPOSE) up -d --wait

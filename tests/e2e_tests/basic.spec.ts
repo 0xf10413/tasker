@@ -90,9 +90,33 @@ test.describe('basic features', () => {
     await locator.dispatchEvent('focusout');
   });
 
-  test('does remember new description', async ({ page }) => {
-    let rowText = await page.getByTestId("task-row-" + taskDescription + " some more text").innerText();
+  const newTaskDescription = taskDescription + " some more text";
 
-    expect(rowText).toContain(taskDescription + " some more text")
+  test('does remember new description', async ({ page }) => {
+    let rowText = await page.getByTestId("task-row-" + newTaskDescription).innerText();
+
+    expect(rowText).toContain(newTaskDescription)
+  });
+
+
+  // Task clean up
+  test('can flag the task as done again', async ({ page }) => {
+    await page.getByTestId('task-flag-done-' + newTaskDescription).click();
+  });
+
+  test('does remember the task as done again', async ({ page }) => {
+    let rowText = await page.getByTestId("task-row-" + newTaskDescription).innerText();
+
+    expect(rowText).toContain(newTaskDescription)
+    expect(rowText).not.toMatch(/\([A-Z]\)/) // Priority not shown
+    expect(rowText).toContain("✗") // "Done" marker
+  });
+
+  test('can trigger clean up', async ({ page }) => {
+    await page.getByRole('button', { name: 'Perform task cleanup' }).click();
+  });
+
+  test('does indeed remove all tasks', async ({ page }) => {
+    expect(await page.locator('body').innerText()).not.toContain(newTaskDescription);
   });
 })

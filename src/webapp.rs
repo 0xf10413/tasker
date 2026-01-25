@@ -66,6 +66,7 @@ pub fn build_app(state: AppState) -> Router {
         .route("/lower-priority/{task_id}", post(lower_priority))
         .route("/add-new-task", post(add_new_task))
         .route("/update-description/{task_id}", post(update_description))
+        .route("/task-cleanup", post(task_cleanup))
         .with_state(state)
         .layer(TraceLayer::new_for_http())
 }
@@ -173,6 +174,14 @@ async fn update_description(
     Ok(Response::new(Body::empty()))
 }
 
+async fn task_cleanup(State(state): State<AppState>) -> Result<Redirect> {
+    let mut task_repo = TaskRepo::new(state.connection_factory);
+
+    task_repo.cleanup()?;
+
+    Ok(Redirect::to("/"))
+}
+
 #[cfg(test)]
 mod tests {
     use crate::sql_connection_factory::tests::TempDirSqliteConnectionFactory;
@@ -181,6 +190,43 @@ mod tests {
     use axum::http::{self, Request, header::LOCATION};
     use http_body_util::BodyExt;
     use tower::Service;
+
+    async fn add_new_task(app: &mut Router, priority: char, description: &str) {
+        let response = app
+            .call(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/add-new-task")
+                    .header(
+                        http::header::CONTENT_TYPE,
+                        mime::APPLICATION_WWW_FORM_URLENCODED.as_ref(),
+                    )
+                    .body(Body::from(format!(
+                        "priority={priority}&description={description}"
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert_eq!(response.headers().get(LOCATION).unwrap(), "/");
+    }
+
+    async fn parse_body(response: Response<Body>) -> String {
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        String::from_utf8(body.to_vec()).unwrap()
+    }
+
+    async fn get_main_page_body(app: &mut Router) -> String {
+        let response = app
+            .call(Request::builder().uri("/").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        parse_body(response).await
+    }
 
     #[tokio::test]
     async fn full_usage() {
@@ -191,39 +237,8 @@ mod tests {
             connection_factory: connection_factory,
         });
 
-        async fn parse_body(response: Response<Body>) -> String {
-            let body = response.into_body().collect().await.unwrap().to_bytes();
-            String::from_utf8(body.to_vec()).unwrap()
-        }
-
-        async fn get_main_page_body(app: &mut Router) -> String {
-            let response = app
-                .call(Request::builder().uri("/").body(Body::empty()).unwrap())
-                .await
-                .unwrap();
-            assert_eq!(response.status(), StatusCode::OK);
-
-            parse_body(response).await
-        }
-
         // Add new task
-        let response = app
-            .call(
-                Request::builder()
-                    .method(http::Method::POST)
-                    .uri("/add-new-task")
-                    .header(
-                        http::header::CONTENT_TYPE,
-                        mime::APPLICATION_WWW_FORM_URLENCODED.as_ref(),
-                    )
-                    .body(Body::from("priority=B&description=SomeTask"))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(response.status(), StatusCode::SEE_OTHER);
-        assert_eq!(response.headers().get(LOCATION).unwrap(), "/");
+        add_new_task(&mut app, 'B', "SomeTask").await;
 
         // Ensure it appears in the output
         let parsed_body = get_main_page_body(&mut app).await;
@@ -322,5 +337,61 @@ mod tests {
 
         // Body empty for this request as there is no need for replacement
         assert_eq!(parsed_body.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn task_cleanup() {
+        let connection_factory = Arc::new(TempDirSqliteConnectionFactory::new().unwrap());
+        TaskRepo::new(connection_factory.clone()).init_db().unwrap();
+
+        let mut app = build_app(AppState {
+            connection_factory: connection_factory,
+        });
+
+        // Add new task
+        add_new_task(&mut app, 'B', "SomeTask").await;
+        add_new_task(&mut app, 'A', "SomeImportantTask").await;
+        add_new_task(&mut app, 'C', "SomeNotImportantTask").await;
+
+        // Flag some of them as done
+        for i in 1..3 {
+            let response = app
+                .call(
+                    Request::builder()
+                        .method(http::Method::POST)
+                        .uri(format!("/flag-done/{i}"))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+        }
+
+        // Ensure they are still in the main page
+        let parsed_body = get_main_page_body(&mut app).await;
+        assert!(parsed_body.contains("SomeTask"));
+        assert!(parsed_body.contains("SomeImportantTask"));
+        assert!(parsed_body.contains("SomeNotImportantTask"));
+
+        // Trigger cleanup
+        let response = app
+            .call(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/task-cleanup")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert_eq!(response.headers().get(LOCATION).unwrap(), "/");
+
+        // Ensure they have been deleted
+        let parsed_body = get_main_page_body(&mut app).await;
+        assert!(!parsed_body.contains("SomeTask")); // Done => removed
+        assert!(!parsed_body.contains("SomeImportantTask")); // Done => removed
+        assert!(parsed_body.contains("SomeNotImportantTask")); // Pending => kept
     }
 }

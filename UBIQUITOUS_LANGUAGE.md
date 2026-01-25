@@ -42,3 +42,7 @@ x wish mom a happy birthday
 ```
 
 Note that the priority of completed tasks is not shown under this representation, but may be kept internally.
+
+## Deleting tasks
+
+Completed tasks may be _deleted_ at any time. For the sake of simplicity, this deletion is performed at the user's request. This process is called _task cleanup_ and deletes all completed tasks.
