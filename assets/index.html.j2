@@ -34,9 +34,10 @@
       {% for project in projects %}
       <form action="/">
         {% if current_project != project %}
-        <input type="hidden" name="project" value="{{ project }}"/>
+        <input type="hidden" name="project" value="{{ project }}" />
         {% endif %}
-        <input class="p-2 m-2 btn {% if current_project != project %}btn-secondary {% else %}btn-light {% endif %}" type="submit" value="{{ project }}"/>
+        <input class="p-2 m-2 btn {% if current_project != project %}btn-secondary {% else %}btn-light {% endif %}"
+          type="submit" value="{{ project }}" />
       </form>
       {% endfor %}
     </div>
@@ -69,7 +70,12 @@
         <input type="text" name="description" class="form-control" required placeholder="Description" />
       </div>
       <div class="mb-3">
-        <input type="text" name="project" class="form-control" placeholder="Project" />
+        <input type="text" list="projects" name="project" class="form-control" placeholder="Project" />
+        <datalist id="projects">
+          {% for project in projects %}
+          <option value="{{ project }}"></option>
+          {% endfor %}
+        </datalist>
       </div>
       <input type="submit" class="btn btn-secondary mb-3" value="Add" />
     </form>
