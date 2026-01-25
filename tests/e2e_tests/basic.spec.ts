@@ -85,9 +85,7 @@ test.describe('basic features', () => {
 
     await locator.click();
     await locator.pressSequentially(" some more text");
-
-    // TODO: find a more elegant way of simulating this in playwright
-    await locator.dispatchEvent('focusout');
+    await page.keyboard.press('Tab'); // simulate loss of focus
   });
 
   const newTaskDescription = taskDescription + " some more text";
