@@ -1,0 +1,41 @@
+<tr data-testid="task-row-{{ task.description }}">
+    <td>
+        {% if task.completed %}
+
+        ✗
+
+        {% else %}
+
+        <span hx-post="/increase-priority/{{ task.id }}" hx-target="closest tr" hx-swap="outerHTML"
+            data-testid="task-increase-priority-{{ task.description }}">
+            ↑
+        </span>
+
+        ({{ task.priority }})
+
+        <span hx-post="/lower-priority/{{ task.id }}" hx-target="closest tr" hx-swap="outerHTML"
+            data-testid="task-lower-priority-{{ task.description }}">
+            ↓
+        </span>
+
+        {% endif %}
+    </td>
+    <td hx-vars="task_description:this.textContent.trim()" hx-post="/update-description/{{ task.id }}"
+        hx-trigger="focusout" hx-target="closest tr" hx-swap="none" {% if task.completed %} class="task-done" {% else %}
+        contenteditable="true" contenteditable="plaintext-only" class="noLineBreaksInEdit" {%endif%}>
+        {{ task.description }}
+    </td>
+
+    <td {% if task.completed %} hx-post="/flag-pending/{{ task.id }}" {% else %} hx-post="/flag-done/{{ task.id }}" {%
+        endif %} hx-target="closest tr" hx-swap="outerHTML">
+        {% if task.completed %}
+        <span title="Flag task as &quot;pending&quot;" data-testid="task-flag-pending-{{ task.description }}">
+            ⟳
+        </span>
+        {% else %}
+        <span title="Flag task as &quot;done&quot;" data-testid="task-flag-done-{{ task.description }}">
+            ✓
+        </span>
+        {% endif %}
+    </td>
+</tr>

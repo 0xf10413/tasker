@@ -5,6 +5,7 @@ use rusqlite::named_params;
 
 use crate::sql_connection_factory::SqlConnectionFactory;
 use crate::task::Task;
+use crate::task::TaskError;
 use crate::task::TaskId;
 
 pub struct TaskRepo {
@@ -17,6 +18,7 @@ pub enum TaskRepoError {
     SqlError { original_error: rusqlite::Error },
     IoError { original_error: std::io::Error },
     JinjaError { original_error: minijinja::Error }, // TODO: this is not really a repo error...
+    TaskError { original_error: TaskError },         // TODO: this is not really a repo error...
 }
 
 impl From<rusqlite::Error> for TaskRepoError {
@@ -35,8 +37,15 @@ impl From<std::io::Error> for TaskRepoError {
     }
 }
 
+impl From<TaskError> for TaskRepoError {
+    fn from(value: TaskError) -> Self {
+        TaskRepoError::TaskError {
+            original_error: value,
+        }
+    }
+}
+
 impl TaskRepo {
-    // TODO: check if can be removed
     pub fn new(connection_factory: Arc<dyn SqlConnectionFactory>) -> TaskRepo {
         TaskRepo {
             connection_factory: connection_factory,

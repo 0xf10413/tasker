@@ -8,15 +8,16 @@ use crate::task::TaskId;
 use crate::task_repo::{TaskRepo, TaskRepoError};
 use axum::body::Body;
 use axum::extract::State;
+use axum::http::Response;
 use axum::http::StatusCode;
 use axum::{
     Form, Router,
     extract::Path,
-    response::{Html, IntoResponse, Redirect, Response, Result},
+    response::{Html, IntoResponse, Redirect, Result},
     routing::{get, post},
 };
 use minijinja::{Environment, context, path_loader};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tower_http::trace::TraceLayer;
 
 impl IntoResponse for TaskRepoError {
@@ -26,6 +27,7 @@ impl IntoResponse for TaskRepoError {
             Self::SqlError { original_error } => original_error.to_string(),
             Self::IoError { original_error } => original_error.to_string(),
             Self::JinjaError { original_error } => original_error.to_string(),
+            Self::TaskError { original_error } => original_error.to_string(),
         };
 
         (StatusCode::INTERNAL_SERVER_ERROR, body).into_response()
@@ -68,15 +70,18 @@ pub fn build_app(state: AppState) -> Router {
         .layer(TraceLayer::new_for_http());
 }
 
-async fn root(State(state): State<AppState>) -> Result<Html<String>, TaskRepoError> {
-    let mut task_repo = TaskRepo::new(state.connection_factory);
-
+fn render<S: Serialize>(template: &str, context: S) -> Result<Html<String>, TaskRepoError> {
     let mut minijinja_env = Environment::new();
     minijinja_env.set_loader(path_loader("assets"));
-    let template = minijinja_env.get_template("index.html.j2")?;
-    return Ok(Html(
-        template.render(context! { tasks => task_repo.get_all_tasks()? })?,
-    ));
+    let template = minijinja_env.get_template(template)?;
+    return Ok(Html(template.render(context)?));
+}
+
+async fn root(State(state): State<AppState>) -> Result<Html<String>, TaskRepoError> {
+    let mut task_repo = TaskRepo::new(state.connection_factory);
+    let all_tasks = task_repo.get_all_tasks()?;
+
+    render("index.html.j2", context! { tasks => all_tasks })
 }
 
 #[derive(Deserialize)]
@@ -97,53 +102,56 @@ async fn add_new_task(
     return Ok(Redirect::to("/"));
 }
 
-async fn flag_done(State(state): State<AppState>, Path(task_id): Path<TaskId>) -> Result<Redirect> {
+async fn flag_done(
+    State(state): State<AppState>,
+    Path(task_id): Path<TaskId>,
+) -> Result<Html<String>, TaskRepoError> {
     let mut task_repo = TaskRepo::new(state.connection_factory);
 
     let mut task = task_repo.get_task(task_id)?;
     task.completed = true;
     task_repo.persist_task(&task)?;
 
-    return Ok(Redirect::to("/"));
+    render("task_row.html.j2", context! { task => task })
 }
 
 async fn flag_pending(
     State(state): State<AppState>,
     Path(task_id): Path<TaskId>,
-) -> Result<Redirect> {
+) -> Result<Html<String>, TaskRepoError> {
     let mut task_repo = TaskRepo::new(state.connection_factory);
 
     let mut task = task_repo.get_task(task_id)?;
     task.completed = false;
     task_repo.persist_task(&task)?;
 
-    return Ok(Redirect::to("/"));
+    render("task_row.html.j2", context! { task => task })
 }
 
 async fn increase_priority(
     State(state): State<AppState>,
     Path(task_id): Path<TaskId>,
-) -> Result<Redirect> {
+) -> Result<Html<String>, TaskRepoError> {
     let mut task_repo = TaskRepo::new(state.connection_factory);
 
     let mut task = task_repo.get_task(task_id)?;
     task.increase_priority();
     task_repo.persist_task(&task)?;
 
-    return Ok(Redirect::to("/"));
+    render("task_row.html.j2", context! { task => task })
 }
 
 async fn lower_priority(
     State(state): State<AppState>,
     Path(task_id): Path<TaskId>,
-) -> Result<Redirect> {
+) -> Result<Html<String>, TaskRepoError> {
     let mut task_repo = TaskRepo::new(state.connection_factory);
 
     let mut task = task_repo.get_task(task_id)?;
     task.lower_priority();
     task_repo.persist_task(&task)?;
 
-    return Ok(Redirect::to("/"));
+    render("task_row.html.j2", context! { task => task })
 }
 
 #[derive(Deserialize)]
@@ -155,14 +163,14 @@ async fn update_description(
     State(state): State<AppState>,
     Path(task_id): Path<TaskId>,
     Form(task_description): Form<UpdateDescriptionInput>,
-) -> Result<Redirect> {
+) -> Result<Response<Body>> {
     let mut task_repo = TaskRepo::new(state.connection_factory);
 
     let mut task = task_repo.get_task(task_id)?;
     task.description = String::from(task_description.task_description.trim());
     task_repo.persist_task(&task)?;
 
-    return Ok(Redirect::to("/"));
+    return Ok(Response::new(Body::empty()));
 }
 
 #[cfg(test)]
@@ -183,6 +191,11 @@ mod tests {
             connection_factory: connection_factory,
         });
 
+        async fn parse_body(response: Response<Body>) -> String {
+            let body = response.into_body().collect().await.unwrap().to_bytes();
+            String::from_utf8(body.to_vec()).unwrap()
+        }
+
         async fn get_main_page_body(app: &mut Router) -> String {
             let response = app
                 .call(Request::builder().uri("/").body(Body::empty()).unwrap())
@@ -190,8 +203,7 @@ mod tests {
                 .unwrap();
             assert_eq!(response.status(), StatusCode::OK);
 
-            let body = response.into_body().collect().await.unwrap().to_bytes();
-            String::from_utf8(body.to_vec()).unwrap()
+            parse_body(response).await
         }
 
         // Add new task
@@ -229,11 +241,10 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(response.status(), StatusCode::SEE_OTHER);
-        assert_eq!(response.headers().get(LOCATION).unwrap(), "/");
+        assert_eq!(response.status(), StatusCode::OK);
+        let parsed_body = parse_body(response).await;
 
         // Ensure priority was increased
-        let parsed_body = get_main_page_body(&mut app).await;
         assert!(!parsed_body.contains("(B)"));
         assert!(parsed_body.contains("(A)"));
 
@@ -248,11 +259,10 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(response.status(), StatusCode::SEE_OTHER);
-        assert_eq!(response.headers().get(LOCATION).unwrap(), "/");
+        assert_eq!(response.status(), StatusCode::OK);
+        let parsed_body = parse_body(response).await;
 
         // Ensure priority was increased
-        let parsed_body = get_main_page_body(&mut app).await;
         assert!(!parsed_body.contains("(A)"));
         assert!(parsed_body.contains("(B)"));
 
@@ -267,11 +277,10 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(response.status(), StatusCode::SEE_OTHER);
-        assert_eq!(response.headers().get(LOCATION).unwrap(), "/");
+        assert_eq!(response.status(), StatusCode::OK);
+        let parsed_body = parse_body(response).await;
 
         // Ensure task is flagged as done
-        let parsed_body = get_main_page_body(&mut app).await;
         assert!(!parsed_body.contains("✓"));
         assert!(parsed_body.contains("✗"));
 
@@ -286,11 +295,10 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(response.status(), StatusCode::SEE_OTHER);
-        assert_eq!(response.headers().get(LOCATION).unwrap(), "/");
+        assert_eq!(response.status(), StatusCode::OK);
+        let parsed_body = parse_body(response).await;
 
         // Ensure task is flagged as pending
-        let parsed_body = get_main_page_body(&mut app).await;
         assert!(!parsed_body.contains("✗"));
         assert!(parsed_body.contains("✓"));
 
@@ -309,12 +317,10 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(response.status(), StatusCode::SEE_OTHER);
-        assert_eq!(response.headers().get(LOCATION).unwrap(), "/");
+        assert_eq!(response.status(), StatusCode::OK);
+        let parsed_body = parse_body(response).await;
 
-        // Ensure task is flagged as pending
-        let parsed_body = get_main_page_body(&mut app).await;
-        assert!(!parsed_body.contains("SomeTask"));
-        assert!(parsed_body.contains("SomeNewTask"));
+        // Body empty for this request as there is no need for replacement
+        assert_eq!(parsed_body.len(), 0);
     }
 }

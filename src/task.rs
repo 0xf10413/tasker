@@ -16,6 +16,14 @@ pub enum TaskError {
     PriorityNotInRangeError(char),
 }
 
+impl std::fmt::Display for TaskError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::PriorityNotInRangeError(c) => write!(f, "Priority {} is invalid", c),
+        }
+    }
+}
+
 impl Task {
     // Creates a brand new, never-persisted-before Task
     pub fn new(priority: char, description: &str) -> Result<Task, TaskError> {
