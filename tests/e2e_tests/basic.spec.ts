@@ -28,17 +28,17 @@ test.describe('basic features', () => {
     expect(rowText).toContain("(B)")
   });
 
-  // Flagging as "done"
-  test('can flag the task as done', async ({ page }) => {
-    await page.getByTestId('task-flag-done-' + taskDescription).click();
+  // Flagging as "Completed"
+  test('can flag the task as completed', async ({ page }) => {
+    await page.getByTestId('task-flag-completed-' + taskDescription).click();
   });
 
-  test('does remember the task as done', async ({ page }) => {
+  test('does remember the task as completed', async ({ page }) => {
     let rowText = await page.getByTestId("task-row-" + taskDescription).innerText();
 
     expect(rowText).toContain(taskDescription)
     expect(rowText).not.toMatch(/\([A-Z]\)/) // Priority not shown
-    expect(rowText).toContain("✗") // "Done" marker
+    expect(rowText).toContain("✗") // "Completed" marker
   });
 
   // Flagging as "pending"
@@ -51,7 +51,7 @@ test.describe('basic features', () => {
 
     expect(rowText).toContain(taskDescription)
     expect(rowText).toContain("(B)") // Priority shown (and remembered)
-    expect(rowText).not.toContain("✗") // "Done" marker
+    expect(rowText).not.toContain("✗") // "Completed" marker
   });
 
 
@@ -100,16 +100,16 @@ test.describe('basic features', () => {
 
 
   // Task clean up
-  test('can flag the task as done again', async ({ page }) => {
-    await page.getByTestId('task-flag-done-' + newTaskDescription).click();
+  test('can flag the task as completed again', async ({ page }) => {
+    await page.getByTestId('task-flag-completed-' + newTaskDescription).click();
   });
 
-  test('does remember the task as done again', async ({ page }) => {
+  test('does remember the task as completed again', async ({ page }) => {
     let rowText = await page.getByTestId("task-row-" + newTaskDescription).innerText();
 
     expect(rowText).toContain(newTaskDescription)
     expect(rowText).not.toMatch(/\([A-Z]\)/) // Priority not shown
-    expect(rowText).toContain("✗") // "Done" marker
+    expect(rowText).toContain("✗") // "completed" marker
   });
 
   test('can trigger clean up', async ({ page }) => {

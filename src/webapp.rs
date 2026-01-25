@@ -61,7 +61,7 @@ pub fn build_app(state: AppState) -> Router {
     Router::new()
         .route("/", get(root))
         .route("/flag-pending/{task_id}", post(flag_pending))
-        .route("/flag-done/{task_id}", post(flag_done))
+        .route("/flag-completed/{task_id}", post(flag_completed))
         .route("/increase-priority/{task_id}", post(increase_priority))
         .route("/lower-priority/{task_id}", post(lower_priority))
         .route("/add-new-task", post(add_new_task))
@@ -103,7 +103,7 @@ async fn add_new_task(
     Ok(Redirect::to("/"))
 }
 
-async fn flag_done(
+async fn flag_completed(
     State(state): State<AppState>,
     Path(task_id): Path<TaskId>,
 ) -> Result<Html<String>, TaskRepoError> {
@@ -279,12 +279,12 @@ mod tests {
         assert!(!parsed_body.contains("(A)"));
         assert!(parsed_body.contains("(B)"));
 
-        // Flag as done
+        // Flag as completed
         let response = app
             .call(
                 Request::builder()
                     .method(http::Method::POST)
-                    .uri("/flag-done/1")
+                    .uri("/flag-completed/1")
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -293,7 +293,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
         let parsed_body = parse_body(response).await;
 
-        // Ensure task is flagged as done
+        // Ensure task is flagged as completed
         assert!(!parsed_body.contains("✓"));
         assert!(parsed_body.contains("✗"));
 
@@ -349,13 +349,13 @@ mod tests {
         add_new_task(&mut app, 'A', "SomeImportantTask").await;
         add_new_task(&mut app, 'C', "SomeNotImportantTask").await;
 
-        // Flag some of them as done
+        // Flag some of them as completed
         for i in 1..=2 {
             let response = app
                 .call(
                     Request::builder()
                         .method(http::Method::POST)
-                        .uri(format!("/flag-done/{i}"))
+                        .uri(format!("/flag-completed/{i}"))
                         .body(Body::empty())
                         .unwrap(),
                 )
@@ -386,8 +386,8 @@ mod tests {
 
         // Ensure they have been deleted
         let parsed_body = get_main_page_body(&mut app).await;
-        assert!(!parsed_body.contains("SomeTask")); // Done => removed
-        assert!(!parsed_body.contains("SomeImportantTask")); // Done => removed
+        assert!(!parsed_body.contains("SomeTask")); // Completed => removed
+        assert!(!parsed_body.contains("SomeImportantTask")); // Completed => removed
         assert!(parsed_body.contains("SomeNotImportantTask")); // Pending => kept
     }
 }

@@ -7,7 +7,7 @@
   <title>Tasker</title>
 
   <style>
-    .task-done {
+    .task-completed {
       text-decoration: line-through;
     }
   </style>
@@ -31,9 +31,9 @@
     <table class="table table-hover">
       <thead>
         <tr>
-          <th><!-- Priority/Done --></th>
+          <th><!-- Priority/Completed --></th>
           <th>Description</th>
-          <th><!-- Flag as done/pending --></th>
+          <th><!-- Flag as completed/pending --></th>
         </tr>
       </thead>
 
@@ -57,7 +57,7 @@
 
     <h2>Task cleanup</h2>
     <form method="post" action="/task-cleanup">
-      <p>Task cleanup deletes all done tasks.</p>
+      <p>Task cleanup deletes all completed tasks.</p>
       <div>
         <input type="submit" class="btn btn-secondary" value="Perform task cleanup" />
       </div>

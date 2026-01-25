@@ -2,7 +2,7 @@
 
 ## Definitions
 
-A _task_ represents some action that must be done.
+A _task_ represents some action that must be performed.
 
 It is defined by:
 * a _priority_, which is a capital letter from the latin alphabet (i.e. one of {A, B, ..., Z})
@@ -13,9 +13,9 @@ Internally, to ease their manipulations, tasks may also bear an _identifier_ (or
 
 A task with no completed status is _pending_. This is the default status.
 
-A task may be _flagged_ as _done_ when the corresponding action is completed. Tasks have no other status.
+A task may be _flagged_ as _completed_ when the corresponding action is completed. Tasks have no other status.
 
-_Flagging as pending_ is the action of reverting the status from "done" back to "pending".
+_Flagging as pending_ is the action of reverting the status from "completed" back to "pending".
 
 The collection of all tasks is called a _task list_.
 
