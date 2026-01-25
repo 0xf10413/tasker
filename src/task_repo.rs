@@ -205,7 +205,7 @@ mod tests {
         // Should be unchanged
         assert_eq!(retrieved_task.priority, 'B');
         assert_eq!(retrieved_task.description, "Medium task");
-        assert_eq!(retrieved_task.completed, false);
+        assert!(!retrieved_task.completed);
 
         // Let's update it
         retrieved_task.lower_priority();
@@ -220,7 +220,7 @@ mod tests {
         // Should have new fields
         assert_eq!(retrieved_task.priority, 'C');
         assert_eq!(retrieved_task.description, "A new description");
-        assert_eq!(retrieved_task.completed, true);
+        assert!(retrieved_task.completed);
 
         Ok(())
     }

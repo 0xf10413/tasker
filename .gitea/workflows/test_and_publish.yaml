@@ -24,7 +24,7 @@ jobs:
         run: cargo fmt --check
 
       - name: Run linter
-        run: cargo clippy
+        run: cargo clippy --all-targets
 
       - name: Build binaries (non-optimized)
         run: cargo build

@@ -4,7 +4,7 @@ fmt:
 	cargo fmt
 
 lint:
-	cargo clippy
+	cargo clippy --all-targets
 
 build:
 	cargo build

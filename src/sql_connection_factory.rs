@@ -42,7 +42,7 @@ pub mod tests {
                     .to_str()
                     .expect("Path should be OK as generated internally")
             );
-            Ok(Connection::open(full_path)?)
+            Connection::open(full_path)
         }
     }
 }

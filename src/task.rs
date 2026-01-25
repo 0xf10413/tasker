@@ -68,7 +68,7 @@ mod tests {
         let mut task = Task::new('A', "Some nice task").expect("Task creation should not fail");
 
         assert_eq!(task.id, -1); // Unpersisted tasks should have a special ID
-        assert_eq!(task.completed, false); // Newly created tasks are not done
+        assert!(!task.completed); // Newly created tasks are not done
         assert_eq!(task.priority, 'A');
         assert_eq!(task.description, "Some nice task");
 

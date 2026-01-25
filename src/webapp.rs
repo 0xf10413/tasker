@@ -233,9 +233,7 @@ mod tests {
         let connection_factory = Arc::new(TempDirSqliteConnectionFactory::new().unwrap());
         TaskRepo::new(connection_factory.clone()).init_db().unwrap();
 
-        let mut app = build_app(AppState {
-            connection_factory: connection_factory,
-        });
+        let mut app = build_app(AppState { connection_factory });
 
         // Add new task
         add_new_task(&mut app, 'B', "SomeTask").await;
@@ -344,9 +342,7 @@ mod tests {
         let connection_factory = Arc::new(TempDirSqliteConnectionFactory::new().unwrap());
         TaskRepo::new(connection_factory.clone()).init_db().unwrap();
 
-        let mut app = build_app(AppState {
-            connection_factory: connection_factory,
-        });
+        let mut app = build_app(AppState { connection_factory });
 
         // Add new task
         add_new_task(&mut app, 'B', "SomeTask").await;
