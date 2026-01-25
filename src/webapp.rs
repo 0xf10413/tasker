@@ -7,6 +7,7 @@ use crate::task::TaskId;
 
 use crate::task_repo::{TaskRepo, TaskRepoError};
 use axum::body::Body;
+use axum::extract::Query;
 use axum::extract::State;
 use axum::http::Response;
 use axum::http::StatusCode;
@@ -88,11 +89,23 @@ fn render<S: Serialize>(template: &str, context: S) -> Result<Html<String>, Task
     Ok(Html(template.render(context)?))
 }
 
-async fn root(State(state): State<AppState>) -> Result<Html<String>, TaskRepoError> {
-    let mut task_repo = TaskRepo::new(state.connection_factory);
-    let all_tasks = task_repo.get_all_tasks()?;
+#[derive(Deserialize)]
+struct ProjectSelect {
+    project: Option<String>,
+}
 
-    render("index.html.j2", context! { tasks => all_tasks })
+async fn root(
+    State(state): State<AppState>,
+    Query(project): Query<ProjectSelect>,
+) -> Result<Html<String>, TaskRepoError> {
+    let mut task_repo = TaskRepo::new(state.connection_factory);
+    let all_tasks = task_repo.get_all_tasks(project.project.as_deref())?;
+    let all_projects = task_repo.get_all_projects()?;
+
+    render(
+        "index.html.j2",
+        context! { tasks => all_tasks, projects => all_projects, current_project => project.project },
+    )
 }
 
 #[derive(Deserialize)]

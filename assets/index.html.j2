@@ -26,7 +26,22 @@
 <body>
 
   <div class="container">
-    <h1>Tasks</h1>
+    <h1>Tasker</h1>
+
+    {% if projects %}
+    <h2>Projects</h2>
+    <div class="d-flex flex-row">
+      {% for project in projects %}
+      <form action="/">
+        {% if current_project != project %}
+        <input type="hidden" name="project" value="{{ project }}"/>
+        {% endif %}
+        <input class="p-2 m-2 btn {% if current_project != project %}btn-secondary {% else %}btn-light {% endif %}" type="submit" value="{{ project }}"/>
+      </form>
+      {% endfor %}
+    </div>
+    {% endif %}
+
     <h2>Task list</h2>
     <table class="table table-hover">
       <thead>

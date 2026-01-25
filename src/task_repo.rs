@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use rusqlite::Row;
 use rusqlite::named_params;
+use rusqlite::params_from_iter;
 
 use crate::sql_connection_factory::SqlConnectionFactory;
 use crate::task::Task;
@@ -89,15 +90,25 @@ impl TaskRepo {
         Ok(())
     }
 
-    pub fn get_all_tasks(&mut self) -> Result<Vec<Task>, TaskRepoError> {
+    pub fn get_all_tasks(
+        &mut self,
+        project_filter: Option<&str>,
+    ) -> Result<Vec<Task>, TaskRepoError> {
         let conn = self.connection_factory.open()?;
-        let mut stmt = conn.prepare(
-            "
-            SELECT id, priority, description, completed, project FROM tasks
-            ORDER BY completed ASC, priority ASC, description ASC
-            ",
-        )?;
-        let rows = stmt.query_and_then([], Self::task_from_row)?;
+
+        let mut stmt_sql: String =
+            "SELECT id, priority, description, completed, project FROM tasks ".into();
+        if project_filter.is_some() {
+            stmt_sql.push_str("WHERE project = :project ");
+        }
+        stmt_sql.push_str("ORDER BY completed ASC, priority ASC, description ASC");
+
+        let mut stmt = conn.prepare(&stmt_sql)?;
+        let params = match project_filter {
+            None => vec![],
+            Some(s) => vec![s],
+        };
+        let rows = stmt.query_and_then(params_from_iter(params), Self::task_from_row)?;
         rows.into_iter().collect()
     }
 
@@ -154,6 +165,19 @@ impl TaskRepo {
 
         Ok(())
     }
+
+    pub fn get_all_projects(&mut self) -> Result<Vec<String>, rusqlite::Error> {
+        let conn = self.connection_factory.open()?;
+        let mut stmt = conn.prepare(
+            "
+            SELECT DISTINCT project FROM tasks
+            WHERE project != ''
+            ORDER BY project ASC
+            ",
+        )?;
+
+        stmt.query_map([], |row| row.get::<_, String>(0))?.collect()
+    }
 }
 
 #[cfg(test)]
@@ -177,7 +201,7 @@ mod tests {
         task_repo.persist_task(&Task::new('A', "Important task", None).unwrap())?;
         task_repo.persist_task(&Task::new('A', "Another important task", None).unwrap())?;
 
-        let tasks = task_repo.get_all_tasks()?;
+        let tasks = task_repo.get_all_tasks(None)?;
         assert_eq!(tasks.len(), 4);
 
         // Tasks should be sorted per decreasing priority, then alphabetically
@@ -271,10 +295,21 @@ mod tests {
         let global_task = task_repo.get_task(1)?;
         assert_eq!(global_task.project, None);
 
+        let all_projects = task_repo.get_all_projects()?;
+        assert_eq!(all_projects.len(), 0);
+
         // Tasks may have dedicated projects. Projects are created "on-the-fly"
         task_repo.persist_task(&Task::new('A', "Important task", "project".into()).unwrap())?;
         let project_task = task_repo.get_task(2)?;
         assert_eq!(project_task.project, Some("project".into()));
+
+        let all_projects = task_repo.get_all_projects()?;
+        assert_eq!(all_projects, ["project"]);
+
+        // We can filter per project.
+        let filtered_tasks = task_repo.get_all_tasks(Some("project"))?;
+        assert_eq!(filtered_tasks.len(), 1);
+        assert_eq!(filtered_tasks[0].description, "Important task");
 
         Ok(())
     }
