@@ -33,7 +33,7 @@
         <tr>
           <th><!-- Priority/Done --></th>
           <th>Description</th>
-          <th>Done?</th>
+          <th><!-- Flag as done/pending --></th>
         </tr>
       </thead>
 
@@ -46,22 +46,20 @@
 
     <h2>Add new task</h2>
     <form autocomplete="off" method="post" action="/add-new-task">
-      <div>
+      <div class="mb-3">
         <input type="text" name="priority" class="form-control" required placeholder="Priority" pattern="[A-Z]" />
       </div>
-      <div>
-        <label for="description" class="form-label">Description</label>
+      <div class="mb-3">
         <input type="text" name="description" class="form-control" required placeholder="Description" />
       </div>
-      <div>
-        <input type="submit" value="Add" />
-      </div>
+      <input type="submit" class="btn btn-secondary mb-3" value="Add" />
     </form>
 
     <h2>Task cleanup</h2>
     <form method="post" action="/task-cleanup">
+      <p>Task cleanup deletes all done tasks.</p>
       <div>
-        <input type="submit" value="Perform task cleanup" />
+        <input type="submit" class="btn btn-secondary" value="Perform task cleanup" />
       </div>
     </form>
   </div>

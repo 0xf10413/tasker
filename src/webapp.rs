@@ -354,7 +354,7 @@ mod tests {
         add_new_task(&mut app, 'C', "SomeNotImportantTask").await;
 
         // Flag some of them as done
-        for i in 1..3 {
+        for i in 1..=2 {
             let response = app
                 .call(
                     Request::builder()
