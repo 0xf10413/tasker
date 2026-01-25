@@ -70,7 +70,8 @@
         <input type="text" name="description" class="form-control" required placeholder="Description" />
       </div>
       <div class="mb-3">
-        <input type="text" list="projects" name="project" class="form-control" placeholder="Project" />
+        <input type="text" list="projects" name="project" class="form-control" placeholder="Project" {% if
+          current_project %}value="{{ current_project }}" {% endif %} />
         <datalist id="projects">
           {% for project in projects %}
           <option value="{{ project }}"></option>

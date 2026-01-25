@@ -19,7 +19,7 @@ test.describe('basic features', () => {
   test('can add a task with a project', async ({ page }) => {
     await page.getByRole('textbox', { name: 'Priority' }).fill('B');
     await page.getByRole('textbox', { name: 'Description' }).fill(projectTaskDescription);
-    await page.getByRole('textbox', { name: 'Project' }).fill(project);
+    await page.getByPlaceholder('Project').fill(project);
     await page.getByRole('button', { name: 'Add' }).click();
   });
 
