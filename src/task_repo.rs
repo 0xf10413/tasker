@@ -62,6 +62,13 @@ impl TaskRepo {
                 })?,
             description: row.get(2)?,
             completed: row.get(3)?,
+            project: {
+                let raw: String = row.get(4)?;
+                match raw.len() {
+                    0 => None,
+                    _ => Some(raw),
+                }
+            },
         })
     }
 
@@ -73,7 +80,8 @@ impl TaskRepo {
                 id INTEGER PRIMARY KEY,
                 priority TEXT NOT NULL,
                 description TEXT NOT NULL,
-                completed INTEGER NOT NULL
+                completed INTEGER NOT NULL,
+                project TEXT NOT NULL
             )
             ",
             (),
@@ -85,7 +93,7 @@ impl TaskRepo {
         let conn = self.connection_factory.open()?;
         let mut stmt = conn.prepare(
             "
-            SELECT id, priority, description, completed FROM tasks
+            SELECT id, priority, description, completed, project FROM tasks
             ORDER BY completed ASC, priority ASC, description ASC
             ",
         )?;
@@ -97,7 +105,7 @@ impl TaskRepo {
         let conn = self.connection_factory.open()?;
         let mut stmt = conn.prepare(
             "
-            SELECT id, priority, description, completed FROM tasks
+            SELECT id, priority, description, completed, project FROM tasks
             WHERE id = ?
             ",
         )?;
@@ -116,12 +124,12 @@ impl TaskRepo {
             // New task, need to insert
             let mut stmt = conn.prepare(
                 "
-            INSERT INTO tasks (priority, description, completed)
-            VALUES (:priority, :description, :completed)
+            INSERT INTO tasks (priority, description, completed, project)
+            VALUES (:priority, :description, :completed, :project)
             ",
             )?;
 
-            let params = named_params! {":priority": String::from(task.priority), ":description": task.description, ":completed": task.completed};
+            let params = named_params! {":priority": String::from(task.priority), ":description": task.description, ":completed": task.completed, ":project": task.project.as_deref().unwrap_or("")};
             stmt.execute(params)?;
             Ok(())
         } else {
@@ -164,10 +172,10 @@ mod tests {
 
         assert!(task_repo.get_task(-1).is_err());
 
-        task_repo.persist_task(&Task::new('B', "Medium task").unwrap())?;
-        task_repo.persist_task(&Task::new('Z', "Unimportant task").unwrap())?;
-        task_repo.persist_task(&Task::new('A', "Important task").unwrap())?;
-        task_repo.persist_task(&Task::new('A', "Another important task").unwrap())?;
+        task_repo.persist_task(&Task::new('B', "Medium task", None).unwrap())?;
+        task_repo.persist_task(&Task::new('Z', "Unimportant task", None).unwrap())?;
+        task_repo.persist_task(&Task::new('A', "Important task", None).unwrap())?;
+        task_repo.persist_task(&Task::new('A', "Another important task", None).unwrap())?;
 
         let tasks = task_repo.get_all_tasks()?;
         assert_eq!(tasks.len(), 4);
@@ -197,7 +205,7 @@ mod tests {
         // Has to be called always to initialize schema
         task_repo.init_db()?;
 
-        task_repo.persist_task(&Task::new('B', "Medium task").unwrap())?;
+        task_repo.persist_task(&Task::new('B', "Medium task", None).unwrap())?;
 
         // Cheating a bit here, we can guess the ID of a task
         let mut retrieved_task = task_repo.get_task(1)?;
@@ -233,7 +241,7 @@ mod tests {
         // Has to be called always to initialize schema
         task_repo.init_db()?;
 
-        task_repo.persist_task(&Task::new('C', "Some low importance task")?)?;
+        task_repo.persist_task(&Task::new('C', "Some low importance task", None)?)?;
 
         // Pending tasks are spared
         task_repo.cleanup()?;
@@ -246,6 +254,27 @@ mod tests {
         // Completed tasks are deleted
         task_repo.cleanup()?;
         assert!(task_repo.get_task(1).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn project_handling() -> Result<(), TaskRepoError> {
+        let connection_factory = Arc::new(TempDirSqliteConnectionFactory::new()?);
+        let mut task_repo = TaskRepo::new(connection_factory);
+
+        // Has to be called always to initialize schema
+        task_repo.init_db()?;
+
+        // By default, tasks do not pertain to any project
+        task_repo.persist_task(&Task::new('B', "Medium task", None).unwrap())?;
+        let global_task = task_repo.get_task(1)?;
+        assert_eq!(global_task.project, None);
+
+        // Tasks may have dedicated projects. Projects are created "on-the-fly"
+        task_repo.persist_task(&Task::new('A', "Important task", "project".into()).unwrap())?;
+        let project_task = task_repo.get_task(2)?;
+        assert_eq!(project_task.project, Some("project".into()));
 
         Ok(())
     }

@@ -19,8 +19,6 @@ _Flagging as pending_ is the action of reverting the status from "completed" bac
 
 The collection of all tasks is called a _task list_.
 
-> TODO: add concept of context/project
-
 ## Working with tasks
 
 The user can create as many tasks as they want. Only the description and priority are required.
@@ -46,3 +44,13 @@ Note that the priority of completed tasks is not shown under this representation
 ## Deleting tasks
 
 Completed tasks may be _deleted_ at any time. For the sake of simplicity, this deletion is performed at the user's request. This process is called _task cleanup_ and deletes all completed tasks.
+
+## Projects
+
+A _project_ is a group of tasks. A project simply has a _name_ and no other attributes.
+
+Tasks may be part of a project, or not be part of any project.
+
+Projects do not exist outside of tasks. In other words, projects are not created or deleted. They merely exist iff they are mentioned by at least one task.
+
+> TODO: add concept of templates

@@ -16,6 +16,7 @@ use axum::{
     response::{Html, IntoResponse, Redirect, Result},
     routing::{get, post},
 };
+use minijinja::value::ViaDeserialize;
 use minijinja::{Environment, context, path_loader};
 use serde::{Deserialize, Serialize};
 use tower_http::trace::TraceLayer;
@@ -71,10 +72,19 @@ pub fn build_app(state: AppState) -> Router {
         .layer(TraceLayer::new_for_http())
 }
 
+// Fixes printing of projects in the UI.
+fn projectify(project: ViaDeserialize<Option<String>>) -> String {
+    match project.as_deref() {
+        Some(s) => s.into(),
+        None => "".into(),
+    }
+}
+
 fn render<S: Serialize>(template: &str, context: S) -> Result<Html<String>, TaskRepoError> {
-    let mut minijinja_env = Environment::new();
-    minijinja_env.set_loader(path_loader("assets"));
-    let template = minijinja_env.get_template(template)?;
+    let mut env = Environment::new();
+    env.set_loader(path_loader("assets"));
+    env.add_filter("projectify", projectify);
+    let template = env.get_template(template)?;
     Ok(Html(template.render(context)?))
 }
 
@@ -89,15 +99,16 @@ async fn root(State(state): State<AppState>) -> Result<Html<String>, TaskRepoErr
 struct AddNewTaskInput {
     priority: char,
     description: String,
+    project: Option<String>,
 }
 
 async fn add_new_task(
     State(state): State<AppState>,
-    Form(task_desc): Form<AddNewTaskInput>,
+    Form(task): Form<AddNewTaskInput>,
 ) -> Result<Redirect> {
     let mut task_repo = TaskRepo::new(state.connection_factory);
 
-    let task = Task::new(task_desc.priority, &task_desc.description)?;
+    let task = Task::new(task.priority, &task.description, task.project.as_deref())?;
     task_repo.persist_task(&task)?;
 
     Ok(Redirect::to("/"))
@@ -191,7 +202,17 @@ mod tests {
     use http_body_util::BodyExt;
     use tower::Service;
 
-    async fn add_new_task(app: &mut Router, priority: char, description: &str) {
+    async fn add_new_task(
+        app: &mut Router,
+        priority: char,
+        description: &str,
+        project: Option<&str>,
+    ) {
+        let mut form_text: String = format!("priority={priority}&description={description}");
+        if let Some(project) = project {
+            form_text = format!("{form_text}&project={project}");
+        }
+
         let response = app
             .call(
                 Request::builder()
@@ -201,9 +222,7 @@ mod tests {
                         http::header::CONTENT_TYPE,
                         mime::APPLICATION_WWW_FORM_URLENCODED.as_ref(),
                     )
-                    .body(Body::from(format!(
-                        "priority={priority}&description={description}"
-                    )))
+                    .body(Body::from(form_text))
                     .unwrap(),
             )
             .await
@@ -236,7 +255,7 @@ mod tests {
         let mut app = build_app(AppState { connection_factory });
 
         // Add new task
-        add_new_task(&mut app, 'B', "SomeTask").await;
+        add_new_task(&mut app, 'B', "SomeTask", None).await;
 
         // Ensure it appears in the output
         let parsed_body = get_main_page_body(&mut app).await;
@@ -345,9 +364,9 @@ mod tests {
         let mut app = build_app(AppState { connection_factory });
 
         // Add new task
-        add_new_task(&mut app, 'B', "SomeTask").await;
-        add_new_task(&mut app, 'A', "SomeImportantTask").await;
-        add_new_task(&mut app, 'C', "SomeNotImportantTask").await;
+        add_new_task(&mut app, 'B', "SomeTask", None).await;
+        add_new_task(&mut app, 'A', "SomeImportantTask", None).await;
+        add_new_task(&mut app, 'C', "SomeNotImportantTask", None).await;
 
         // Flag some of them as completed
         for i in 1..=2 {
@@ -389,5 +408,21 @@ mod tests {
         assert!(!parsed_body.contains("SomeTask")); // Completed => removed
         assert!(!parsed_body.contains("SomeImportantTask")); // Completed => removed
         assert!(parsed_body.contains("SomeNotImportantTask")); // Pending => kept
+    }
+
+    #[tokio::test]
+    async fn tasks_and_projects() {
+        let connection_factory = Arc::new(TempDirSqliteConnectionFactory::new().unwrap());
+        TaskRepo::new(connection_factory.clone()).init_db().unwrap();
+
+        let mut app = build_app(AppState { connection_factory });
+
+        // Add new task with or without projects
+        add_new_task(&mut app, 'B', "SomeTask", None).await;
+        add_new_task(&mut app, 'B', "SomeOtherTask", Some("project1")).await;
+
+        // Ensure it appears in the output
+        let parsed_body = get_main_page_body(&mut app).await;
+        assert!(parsed_body.contains("project1"));
     }
 }

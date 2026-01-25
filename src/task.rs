@@ -8,6 +8,7 @@ pub struct Task {
     pub priority: char,
     pub description: String,
     pub completed: bool,
+    pub project: Option<String>,
 }
 
 #[derive(Debug)]
@@ -26,14 +27,19 @@ impl std::fmt::Display for TaskError {
 
 impl Task {
     // Creates a brand new, never-persisted-before Task
-    pub fn new(priority: char, description: &str) -> Result<Task, TaskError> {
+    pub fn new(
+        priority: char,
+        description: &str,
+        project: Option<&str>,
+    ) -> Result<Task, TaskError> {
         if !priority.is_ascii_uppercase() {
             return Err(TaskError::PriorityNotInRangeError(priority));
         }
         Ok(Task {
             id: -1,
             priority,
-            description: String::from(description),
+            project: project.map(str::to_string),
+            description: description.into(),
             completed: false,
         })
     }
@@ -65,7 +71,8 @@ mod tests {
 
     #[test]
     fn simple_usage() {
-        let mut task = Task::new('A', "Some nice task").expect("Task creation should not fail");
+        let mut task =
+            Task::new('A', "Some nice task", None).expect("Task creation should not fail");
 
         assert_eq!(task.id, -1); // Unpersisted tasks should have a special ID
         assert!(!task.completed); // Newly created tasks are not completed
@@ -82,9 +89,9 @@ mod tests {
     #[test]
     fn increase_max_priority_lower_min_priority() {
         let mut urgent_task =
-            Task::new('A', "Some urgent task").expect("Task creation should not fail");
+            Task::new('A', "Some urgent task", None).expect("Task creation should not fail");
         let mut unimportant_task =
-            Task::new('Z', "Some unimportant task").expect("Task creation should not fail");
+            Task::new('Z', "Some unimportant task", None).expect("Task creation should not fail");
 
         urgent_task.increase_priority();
         assert_eq!(urgent_task.priority, 'A'); // No failure, but no change either
@@ -95,7 +102,7 @@ mod tests {
 
     #[test]
     fn new_task_out_of_range() {
-        let new_task_result = Task::new('4', "Some task with an invalid priority");
+        let new_task_result = Task::new('4', "Some task with an invalid priority", None);
 
         assert!(new_task_result.is_err(), "Task creation should fail")
     }
