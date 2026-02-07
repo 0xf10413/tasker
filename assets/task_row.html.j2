@@ -20,18 +20,18 @@
 
         {% endif %}
     </td>
-    <td hx-vars="task_description:this.textContent.trim()" hx-post="/update-description/{{ task.id }}"
-        hx-trigger="focusout" hx-target="closest tr" hx-swap="none" {% if task.completed %} class="task-completed" {% else %}
-        contenteditable="true" contenteditable="plaintext-only" class="noLineBreaksInEdit" {%endif%}>
-        {{ task.description }}
+    <td>
+        <input type="text" name="task_description" hx-post="/update-description/{{ task.id }}" hx-target="closest tr"
+            hx-swap="none" class="task-description-editable-input {% if task.completed %}task-completed {% endif %}"
+            value="{{ task.description }}" />
     </td>
 
     <td>
         {{ task.project | projectify }}
     </td>
 
-    <td {% if task.completed %} hx-post="/flag-pending/{{ task.id }}" {% else %} hx-post="/flag-completed/{{ task.id }}" {%
-        endif %} hx-target="closest tr" hx-swap="outerHTML">
+    <td {% if task.completed %} hx-post="/flag-pending/{{ task.id }}" {% else %} hx-post="/flag-completed/{{ task.id }}"
+        {% endif %} hx-target="closest tr" hx-swap="outerHTML">
         {% if task.completed %}
         <span title="Flag task as &quot;pending&quot;" data-testid="task-flag-pending-{{ task.description }}">
             ⟳

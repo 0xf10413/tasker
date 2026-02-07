@@ -3,7 +3,7 @@ import crypto from 'crypto';
 
 const rootUrl = "http://localhost:3000/"
 const projectTaskDescription = "Some project task " + crypto.randomBytes(5).toString('hex');
-const project = "project" + crypto.randomBytes(5).toString('hex');
+const project = "proj" + crypto.randomBytes(2).toString('hex');
 const taskDescription = "Some project task " + crypto.randomBytes(5).toString('hex');
 
 
@@ -24,9 +24,11 @@ test.describe('basic features', () => {
   });
 
   test('can find the task again with the right project', async ({ page }) => {
-    let rowText = await page.getByTestId("task-row-" + projectTaskDescription).innerText();
+    let rowLocator = page.getByTestId("task-row-" + projectTaskDescription);
+    let rowText = await rowLocator.innerText();
+    let rowDescriptionLocator = rowLocator.locator('input');
 
-    expect(rowText).toContain(projectTaskDescription)
+    expect(await rowDescriptionLocator.inputValue()).toBe(projectTaskDescription)
     expect(rowText).toContain("(B)")
     expect(rowText).toContain(project)
   });
@@ -40,17 +42,22 @@ test.describe('basic features', () => {
   });
 
   test('can find the task again without any project', async ({ page }) => {
-    let rowText = await page.getByTestId("task-row-" + taskDescription).innerText();
+    let rowLocator = page.getByTestId("task-row-" + taskDescription);
+    let rowText = await rowLocator.innerText();
+    let rowDescriptionLocator = rowLocator.locator('input');
 
-    expect(rowText).toContain(taskDescription)
+    expect(await rowDescriptionLocator.inputValue()).toBe(taskDescription)
     expect(rowText).toContain("(A)")
   });
 
   test('can filter tasks only on relevant project', async ({ page }) => {
     await page.getByRole('button', { name: project }).click(); // Should trigger navigation
 
-    expect(await page.locator('body').innerText()).not.toContain(taskDescription);
-    expect(await page.locator('body').innerText()).toContain(projectTaskDescription);
+    let rowTaskLocator = page.getByTestId("task-row-" + taskDescription);
+    let rowProjectTaskLocator = page.getByTestId("task-row-" + projectTaskDescription);
+
+    expect(await rowTaskLocator.count()).toEqual(0);
+    expect(await rowProjectTaskLocator.count()).toEqual(1);
   });
 
 })

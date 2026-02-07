@@ -20,9 +20,11 @@ test.describe('basic features', () => {
   });
 
   test('can find the task again with the correct priority', async ({ page }) => {
-    let rowText = await page.getByTestId("task-row-" + taskDescription).innerText();
+    let rowLocator = page.getByTestId("task-row-" + taskDescription);
+    let rowText = await rowLocator.innerText();
+    let rowDescriptionLocator = rowLocator.locator('input');
 
-    expect(rowText).toContain(taskDescription)
+    expect(await rowDescriptionLocator.inputValue()).toBe(taskDescription)
     expect(rowText).toContain("(B)")
   });
 
@@ -32,9 +34,11 @@ test.describe('basic features', () => {
   });
 
   test('does remember the task as completed', async ({ page }) => {
-    let rowText = await page.getByTestId("task-row-" + taskDescription).innerText();
+    let rowLocator = page.getByTestId("task-row-" + taskDescription);
+    let rowText = await rowLocator.innerText();
+    let rowDescriptionLocator = rowLocator.locator('input');
 
-    expect(rowText).toContain(taskDescription)
+    expect(await rowDescriptionLocator.inputValue()).toBe(taskDescription)
     expect(rowText).not.toMatch(/\([A-Z]\)/) // Priority not shown
     expect(rowText).toContain("✗") // "Completed" marker
   });
@@ -45,9 +49,11 @@ test.describe('basic features', () => {
   });
 
   test('does remember the task as pending', async ({ page }) => {
-    let rowText = await page.getByTestId("task-row-" + taskDescription).innerText();
+    let rowLocator = page.getByTestId("task-row-" + taskDescription);
+    let rowText = await rowLocator.innerText();
+    let rowDescriptionLocator = rowLocator.locator('input');
 
-    expect(rowText).toContain(taskDescription)
+    expect(await rowDescriptionLocator.inputValue()).toBe(taskDescription)
     expect(rowText).toContain("(B)") // Priority shown (and remembered)
     expect(rowText).not.toContain("✗") // "Completed" marker
   });
@@ -59,9 +65,11 @@ test.describe('basic features', () => {
   });
 
   test('does remember the priority as increased', async ({ page }) => {
-    let rowText = await page.getByTestId("task-row-" + taskDescription).innerText();
+    let rowLocator = page.getByTestId("task-row-" + taskDescription);
+    let rowText = await rowLocator.innerText();
+    let rowDescriptionLocator = rowLocator.locator('input');
 
-    expect(rowText).toContain(taskDescription)
+    expect(await rowDescriptionLocator.inputValue()).toBe(taskDescription)
     expect(rowText).toContain("(A)")
   });
 
@@ -71,9 +79,11 @@ test.describe('basic features', () => {
   });
 
   test('does remember the priority as lowered', async ({ page }) => {
-    let rowText = await page.getByTestId("task-row-" + taskDescription).innerText();
+    let rowLocator = page.getByTestId("task-row-" + taskDescription);
+    let rowText = await rowLocator.innerText();
+    let rowDescriptionLocator = rowLocator.locator('input');
 
-    expect(rowText).toContain(taskDescription)
+    expect(await rowDescriptionLocator.inputValue()).toBe(taskDescription)
     expect(rowText).toContain("(B)")
   });
 
@@ -89,9 +99,11 @@ test.describe('basic features', () => {
   const newTaskDescription = taskDescription + " some more text";
 
   test('does remember new description', async ({ page }) => {
-    let rowText = await page.getByTestId("task-row-" + newTaskDescription).innerText();
+    let rowLocator = page.getByTestId("task-row-" + newTaskDescription);
+    let rowText = await rowLocator.innerText();
+    let rowDescriptionLocator = rowLocator.locator('input');
 
-    expect(rowText).toContain(newTaskDescription)
+    expect(await rowDescriptionLocator.inputValue()).toBe(newTaskDescription)
   });
 
 
@@ -101,9 +113,11 @@ test.describe('basic features', () => {
   });
 
   test('does remember the task as completed again', async ({ page }) => {
-    let rowText = await page.getByTestId("task-row-" + newTaskDescription).innerText();
+    let rowLocator = page.getByTestId("task-row-" + newTaskDescription);
+    let rowText = await rowLocator.innerText();
+    let rowDescriptionLocator = rowLocator.locator('input');
 
-    expect(rowText).toContain(newTaskDescription)
+    expect(await rowDescriptionLocator.inputValue()).toBe(newTaskDescription)
     expect(rowText).not.toMatch(/\([A-Z]\)/) // Priority not shown
     expect(rowText).toContain("✗") // "completed" marker
   });
@@ -112,7 +126,8 @@ test.describe('basic features', () => {
     await page.getByRole('button', { name: 'Perform task cleanup' }).click();
   });
 
-  test('does indeed remove all tasks', async ({ page }) => {
-    expect(await page.locator('body').innerText()).not.toContain(newTaskDescription);
+  test('does indeed remove all completed tasks', async ({ page }) => {
+    let rowLocator = page.getByTestId("task-row-" + newTaskDescription);
+    expect(await rowLocator.count()).toEqual(0);
   });
 })
