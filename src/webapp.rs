@@ -62,6 +62,7 @@ pub struct AppState {
 pub fn build_app(state: AppState) -> Router {
     Router::new()
         .route("/", get(root))
+        .route("/rename-project", post(rename_project))
         .route("/flag-pending/{task_id}", post(flag_pending))
         .route("/flag-completed/{task_id}", post(flag_completed))
         .route("/increase-priority/{task_id}", post(increase_priority))
@@ -202,6 +203,23 @@ async fn task_cleanup(State(state): State<AppState>) -> Result<Redirect> {
     let mut task_repo = TaskRepo::new(state.connection_factory);
 
     task_repo.cleanup()?;
+
+    Ok(Redirect::to("/"))
+}
+
+#[derive(Deserialize)]
+struct RenameProjectInput {
+    current_project_name: String,
+    new_project_name: String,
+}
+
+async fn rename_project(
+    State(state): State<AppState>,
+    Form(input): Form<RenameProjectInput>,
+) -> Result<Redirect> {
+    let mut task_repo = TaskRepo::new(state.connection_factory);
+
+    task_repo.rename_project(&input.current_project_name, &input.new_project_name)?;
 
     Ok(Redirect::to("/"))
 }
@@ -437,5 +455,29 @@ mod tests {
         // Ensure it appears in the output
         let parsed_body = get_main_page_body(&mut app).await;
         assert!(parsed_body.contains("project1"));
+
+        // Rename project
+        let response = app
+            .call(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/rename-project")
+                    .header(
+                        http::header::CONTENT_TYPE,
+                        mime::APPLICATION_WWW_FORM_URLENCODED.as_ref(),
+                    )
+                    .body(Body::from(
+                        "current_project_name=project1&new_project_name=project2",
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert_eq!(response.headers().get(LOCATION).unwrap(), "/");
+
+        // Ensure new name appears in the output
+        let parsed_body = get_main_page_body(&mut app).await;
+        assert!(parsed_body.contains("project2"));
     }
 }

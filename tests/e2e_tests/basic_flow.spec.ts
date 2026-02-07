@@ -93,7 +93,7 @@ test.describe('basic features', () => {
 
     await locator.click();
     await locator.pressSequentially(" some more text");
-    await page.keyboard.press('Tab'); // simulate loss of focus
+    await page.keyboard.press('Enter');
   });
 
   const newTaskDescription = taskDescription + " some more text";

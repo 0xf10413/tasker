@@ -19,7 +19,7 @@ test.describe('basic features', () => {
   test('can add a task with a project', async ({ page }) => {
     await page.getByRole('textbox', { name: 'Priority' }).fill('B');
     await page.getByRole('textbox', { name: 'Description' }).fill(projectTaskDescription);
-    await page.getByPlaceholder('Project').fill(project);
+    await page.getByPlaceholder('Task project').fill(project);
     await page.getByRole('button', { name: 'Add' }).click();
   });
 
@@ -58,6 +58,21 @@ test.describe('basic features', () => {
 
     expect(await rowTaskLocator.count()).toEqual(0);
     expect(await rowProjectTaskLocator.count()).toEqual(1);
+  });
+
+  test('can rename projects', async ({ page }) => {
+    await page.locator('select[name="current_project_name"]').selectOption(project);
+    await page.getByRole('textbox', { name: 'New project name' }).click();
+    await page.getByRole('textbox', { name: 'New project name' }).fill(project + "-new");
+    await page.getByRole('button', { name: 'Update project name' }).click(); // should trigger navigation
+
+    let rowLocator = page.getByTestId("task-row-" + projectTaskDescription);
+    let rowText = await rowLocator.innerText();
+    let rowDescriptionLocator = rowLocator.locator('input');
+
+    expect(await rowDescriptionLocator.inputValue()).toBe(projectTaskDescription)
+    expect(rowText).toContain("(B)")
+    expect(rowText).toContain(project + "-new")
   });
 
 })

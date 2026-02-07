@@ -178,6 +178,24 @@ impl TaskRepo {
 
         stmt.query_map([], |row| row.get::<_, String>(0))?.collect()
     }
+
+    pub fn rename_project(
+        &mut self,
+        current_project_name: &str,
+        new_project_name: &str,
+    ) -> Result<(), TaskRepoError> {
+        let conn = self.connection_factory.open()?;
+        let mut stmt = conn.prepare(
+            "
+            UPDATE tasks
+            SET project = :new_project_name
+            WHERE project = :current_project_name
+            ",
+        )?;
+        stmt.execute(named_params!{":current_project_name": current_project_name, ":new_project_name": new_project_name})?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -310,6 +328,16 @@ mod tests {
         let filtered_tasks = task_repo.get_all_tasks(Some("project"))?;
         assert_eq!(filtered_tasks.len(), 1);
         assert_eq!(filtered_tasks[0].description, "Important task");
+
+        // We can rename projects
+        task_repo.rename_project("project", "project_2")?;
+        let all_projects = task_repo.get_all_projects()?;
+        assert_eq!(all_projects, ["project_2"]);
+        let filtered_tasks_old_project = task_repo.get_all_tasks(Some("project"))?;
+        assert_eq!(filtered_tasks_old_project.len(), 0);
+        let filtered_tasks_new_project = task_repo.get_all_tasks(Some("project_2"))?;
+        assert_eq!(filtered_tasks_new_project.len(), 1);
+        assert_eq!(filtered_tasks_new_project[0].description, "Important task");
 
         Ok(())
     }
