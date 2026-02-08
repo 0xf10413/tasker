@@ -7,7 +7,7 @@ const project = "proj" + crypto.randomBytes(2).toString('hex');
 const taskDescription = "Some project task " + crypto.randomBytes(5).toString('hex');
 
 
-test.describe('basic features', () => {
+test.describe('project features', () => {
 
   test.beforeEach(async ({ page }) => {
     //Always go to the home page first
@@ -20,7 +20,7 @@ test.describe('basic features', () => {
     await page.getByRole('textbox', { name: 'Priority' }).fill('B');
     await page.getByRole('textbox', { name: 'Description' }).fill(projectTaskDescription);
     await page.getByPlaceholder('Task project').fill(project);
-    await page.getByRole('button', { name: 'Add' }).click();
+    await page.getByRole('button', { name: 'Add new task' }).click();
   });
 
   test('can find the task again with the right project', async ({ page }) => {
@@ -38,7 +38,7 @@ test.describe('basic features', () => {
   test('can add a task without any project', async ({ page }) => {
     await page.getByRole('textbox', { name: 'Priority' }).fill('A');
     await page.getByRole('textbox', { name: 'Description' }).fill(taskDescription);
-    await page.getByRole('button', { name: 'Add' }).click();
+    await page.getByRole('button', { name: 'Add new task' }).click();
   });
 
   test('can find the task again without any project', async ({ page }) => {

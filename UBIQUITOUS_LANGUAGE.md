@@ -51,6 +51,20 @@ A _project_ is a group of tasks. A project simply has a _name_ and no other attr
 
 Tasks may be part of a project, or not be part of any project.
 
-Projects do not exist outside of tasks. In other words, projects are not created or deleted. They merely exist iff they are mentioned by at least one task.
+Projects do not exist outside of tasks. In other words, projects are not directly created or deleted. They merely exist iff they are mentioned by at least one task.
 
-> TODO: add concept of templates
+Projects can be _renamed_.
+
+## Task presets
+
+Some tasks are expected to come back periodically, like tridying up the house.
+
+_Presets_ are collections of (quasi-)tasks that can be _injected_ into the task list.
+
+A (quasi-)task within a preset is called a _preset task_.
+
+Preset tasks only contain a priority and a description. In particular, they have no completion status nor do they pertain to any project.
+
+When a preset is injected into the task list, all created tasks are associated with a project bearing the preset's name.
+
+Due to their additional complexity, unlike projects, presets need to be _created_ first before any preset task can be _added_ to them.

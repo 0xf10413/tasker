@@ -32,10 +32,10 @@
 <body>
 
   <div class="container">
-    <h1>Tasker</h1>
+    <h1>Task management</h1>
 
     {% if projects %}
-    <h2>Projects</h2>
+    <h2>Project selector</h2>
     <div class="d-flex flex-row">
       {% for project in projects %}
       <form action="/">
@@ -84,7 +84,7 @@
           {% endfor %}
         </datalist>
       </div>
-      <input type="submit" class="btn btn-secondary mb-3" value="Add" />
+      <input type="submit" class="btn btn-secondary mb-3" value="Add new task" />
     </form>
 
     <h2>Task cleanup</h2>
@@ -92,6 +92,27 @@
       <p>Task cleanup deletes all completed tasks.</p>
       <div class="mb-3">
         <input type="submit" class="btn btn-secondary" value="Perform task cleanup" />
+      </div>
+    </form>
+
+    <h2>Preset management</h2>
+    <h3>Presets</h3>
+
+    <div class="d-flex flex-row">
+      {% for preset_name in preset_names %}
+      <form action="/preset/{{ preset_name }}">
+        <input type="submit" class="p-2 m-2 btn btn-secondary" value="{{ preset_name }}" />
+      </form>
+      {% endfor %}
+    </div>
+
+    <h3>Add new preset</h3>
+    <form autocomplete="off" method="post" action="/preset">
+      <div class="mb-3">
+        <input type="text" name="preset_name" class="form-control" required placeholder="New preset name" />
+      </div>
+      <div class="mb-3">
+        <input type="submit" class="btn btn-secondary" value="Add new preset" />
       </div>
     </form>
 

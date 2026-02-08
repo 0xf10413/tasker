@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::presets::PresetTask;
 use crate::sql_connection_factory::SqlConnectionFactory;
 use crate::task::Task;
 use crate::task::TaskError;
@@ -30,6 +31,7 @@ impl IntoResponse for TaskRepoError {
             Self::IoError { original_error } => original_error.to_string(),
             Self::JinjaError { original_error } => original_error.to_string(),
             Self::TaskError { original_error } => original_error.to_string(),
+            Self::PresetTaskError { original_error } => original_error.to_string(),
         };
 
         (StatusCode::INTERNAL_SERVER_ERROR, body).into_response()
@@ -61,15 +63,26 @@ pub struct AppState {
 
 pub fn build_app(state: AppState) -> Router {
     Router::new()
+        // Home page
         .route("/", get(root))
-        .route("/rename-project", post(rename_project))
+        // Basic task handling
+        .route("/add-new-task", post(add_new_task))
         .route("/flag-pending/{task_id}", post(flag_pending))
         .route("/flag-completed/{task_id}", post(flag_completed))
         .route("/increase-priority/{task_id}", post(increase_priority))
         .route("/lower-priority/{task_id}", post(lower_priority))
-        .route("/add-new-task", post(add_new_task))
         .route("/update-description/{task_id}", post(update_description))
+        // Advanced manipulation
         .route("/task-cleanup", post(task_cleanup))
+        .route("/rename-project", post(rename_project))
+        // Presets
+        .route("/preset", post(add_new_preset))
+        .route("/preset/{preset_name}", get(get_preset))
+        .route(
+            "/preset/{preset_name}/add-new-preset-task",
+            post(add_new_preset_task),
+        )
+        .route("/preset/{preset_name}/inject", post(inject_preset))
         .with_state(state)
         .layer(TraceLayer::new_for_http())
 }
@@ -102,10 +115,11 @@ async fn root(
     let mut task_repo = TaskRepo::new(state.connection_factory);
     let all_tasks = task_repo.get_all_tasks(project.project.as_deref())?;
     let all_projects = task_repo.get_all_projects()?;
+    let all_preset_names = task_repo.get_all_preset_names()?;
 
     render(
         "index.html.j2",
-        context! { tasks => all_tasks, projects => all_projects, current_project => project.project },
+        context! { tasks => all_tasks, projects => all_projects, current_project => project.project, preset_names => all_preset_names },
     )
 }
 
@@ -224,6 +238,77 @@ async fn rename_project(
     Ok(Redirect::to("/"))
 }
 
+#[derive(Deserialize)]
+struct AddNewPresetInput {
+    preset_name: String,
+}
+
+async fn add_new_preset(
+    State(state): State<AppState>,
+    Form(preset): Form<AddNewPresetInput>,
+) -> Result<Redirect, TaskRepoError> {
+    let mut task_repo = TaskRepo::new(state.connection_factory);
+    task_repo.add_preset(&preset.preset_name)?;
+
+    let redirection_url = format!("/preset/{}", preset.preset_name);
+    Ok(Redirect::to(&redirection_url))
+}
+
+async fn get_preset(
+    State(state): State<AppState>,
+    Path(preset_name): Path<String>,
+) -> Result<Html<String>, TaskRepoError> {
+    let mut task_repo = TaskRepo::new(state.connection_factory);
+    let preset = task_repo.get_preset(&preset_name)?;
+
+    render("preset.html.j2", context! { preset => preset})
+}
+
+#[derive(Deserialize)]
+struct AddNewPresetTaskInput {
+    task_priority: char,
+    task_description: String,
+}
+
+async fn add_new_preset_task(
+    State(state): State<AppState>,
+    Path(preset_name): Path<String>,
+    Form(preset_task): Form<AddNewPresetTaskInput>,
+) -> Result<Redirect, TaskRepoError> {
+    let mut task_repo = TaskRepo::new(state.connection_factory);
+
+    let preset_id = task_repo.get_preset_id_from_preset_name(&preset_name)?;
+
+    let preset_task = PresetTask::new(
+        preset_task.task_priority,
+        &preset_task.task_description,
+        preset_id,
+    )?;
+    task_repo.persist_preset_task(preset_task)?;
+
+    let redirection_url = format!("/preset/{}", preset_name);
+    Ok(Redirect::to(&redirection_url))
+}
+
+async fn inject_preset(
+    State(state): State<AppState>,
+    Path(preset_name): Path<String>,
+) -> Result<Redirect, TaskRepoError> {
+    let mut task_repo = TaskRepo::new(state.connection_factory);
+
+    let preset = task_repo.get_preset(&preset_name)?;
+    for preset_task in preset.tasks {
+        let task = Task::new(
+            preset_task.priority,
+            &preset_task.description,
+            Some(&preset_name),
+        )?;
+        task_repo.persist_task(&task)?
+    }
+
+    Ok(Redirect::to("/"))
+}
+
 #[cfg(test)]
 mod tests {
     use crate::sql_connection_factory::tests::TempDirSqliteConnectionFactory;
@@ -279,7 +364,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn full_usage() {
+    async fn full_basic_flow() {
         let connection_factory = Arc::new(TempDirSqliteConnectionFactory::new().unwrap());
         TaskRepo::new(connection_factory.clone()).init_db().unwrap();
 
@@ -479,5 +564,101 @@ mod tests {
         // Ensure new name appears in the output
         let parsed_body = get_main_page_body(&mut app).await;
         assert!(parsed_body.contains("project2"));
+    }
+
+    #[tokio::test]
+    async fn presets() {
+        let connection_factory = Arc::new(TempDirSqliteConnectionFactory::new().unwrap());
+        TaskRepo::new(connection_factory.clone()).init_db().unwrap();
+
+        let mut app = build_app(AppState { connection_factory });
+
+        // Add new preset
+        let form_text: String = "preset_name=preset1".to_string();
+        let response = app
+            .call(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/preset")
+                    .header(
+                        http::header::CONTENT_TYPE,
+                        mime::APPLICATION_WWW_FORM_URLENCODED.as_ref(),
+                    )
+                    .body(Body::from(form_text))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert_eq!(response.headers().get(LOCATION).unwrap(), "/preset/preset1");
+
+        // Check it out
+        let response = app
+            .call(
+                Request::builder()
+                    .uri("/preset/preset1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let parsed_body = parse_body(response).await;
+        assert!(parsed_body.contains("preset1"));
+
+        // Add a new preset task
+        let form_text: String = "task_priority=A&task_description=my_new_description".to_string();
+        let response = app
+            .call(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/preset/preset1/add-new-preset-task")
+                    .header(
+                        http::header::CONTENT_TYPE,
+                        mime::APPLICATION_WWW_FORM_URLENCODED.as_ref(),
+                    )
+                    .body(Body::from(form_text))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert_eq!(response.headers().get(LOCATION).unwrap(), "/preset/preset1");
+
+        // Check it out
+        let response = app
+            .call(
+                Request::builder()
+                    .uri("/preset/preset1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let parsed_body = parse_body(response).await;
+        assert!(parsed_body.contains("my_new_description"));
+
+        // Nothing should be on the home page yet
+        let parsed_body = get_main_page_body(&mut app).await;
+        assert!(!parsed_body.contains("my_new_description"));
+
+        // Inject preset
+        let response = app
+            .call(
+                Request::builder()
+                    .method(http::Method::POST)
+                    .uri("/preset/preset1/inject")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert_eq!(response.headers().get(LOCATION).unwrap(), "/");
+
+        // And now the task should be injected
+        let parsed_body = get_main_page_body(&mut app).await;
+        assert!(parsed_body.contains("my_new_description"));
     }
 }

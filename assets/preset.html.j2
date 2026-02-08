@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tasker</title>
+
+  <!-- Bootstrap -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/css/bootstrap.min.css"
+    integrity="sha512-2bBQCjcnw658Lho4nlXJcc6WkV/UxpE/sAokbXPxQNGqmNdQrWqtw26Ns9kFF/yG792pKR1Sx8/Y1Lf1XN4GKA=="
+    crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+  <!-- htmx -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/2.0.7/htmx.min.js"
+    integrity="sha512-IisGoumHahmfNIhP4wUV3OhgQZaaDBuD6IG4XlyjT77IUkwreZL3T3afO4xXuDanSalZ57Un+UlAbarQjNZCTQ=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+
+<body>
+
+  <div class="container">
+    <h1>Preset "{{ preset.name }}"</h1>
+    <form action="/">
+      <input type="submit" class="btn btn-secondary mb-3" value="Back to main page" />
+    </form>
+
+    <h2>Preset tasks</h2>
+    <table class="table table-hover">
+      <thead>
+        <tr>
+          <th>Priority</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+
+      <tbody>
+      {% for preset_task in preset.tasks %}
+        <tr data-testid="preset-task-row-{{ preset_task.description }}">
+          <td>{{ preset_task.priority }}</td>
+          <td>{{ preset_task.description }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    <h2>Add new preset task</h2>
+    <form autocomplete="off" method="post" action="/preset/{{ preset.name }}/add-new-preset-task">
+      <div class="mb-3">
+        <input type="text" name="task_priority" class="form-control" required placeholder="Priority" pattern="[A-Z]" />
+      </div>
+      <div class="mb-3">
+        <input type="text" name="task_description" class="form-control" required placeholder="Description" />
+      </div>
+      <input type="submit" class="btn btn-secondary mb-3" value="Add preset task" />
+    </form>
+
+    <h2>Inject preset into task list</h2>
+    <form action="/preset/{{ preset.name }}/inject" method="post" >
+      <input type="submit" class="btn btn-secondary" value="Inject preset" />
+    </form>
+
+  </div>
+  <!-- Bootstrap -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/js/bootstrap.bundle.min.js"
+    integrity="sha512-HvOjJrdwNpDbkGJIG2ZNqDlVqMo77qbs4Me4cah0HoDrfhrbA+8SBlZn1KrvAQw7cILLPFJvdwIgphzQmMm+Pw=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+</body>
+
+</html>

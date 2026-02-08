@@ -1,6 +1,7 @@
 use std::env;
 use std::sync::Arc;
 
+mod presets;
 mod sql_connection_factory;
 mod task;
 mod task_repo;
